@@ -1,7 +1,7 @@
 # Single-stage build on the official Deno image.
 # Deno runs TypeScript directly, so there's no separate compile step or dist/.
 
-FROM denoland/deno:2 AS base
+FROM denoland/deno:latest AS base
 WORKDIR /app
 ENV NODE_ENV=production
 
