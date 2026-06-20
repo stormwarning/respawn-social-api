@@ -30,14 +30,6 @@ const EnvSchema = z.object({
 	TWITCH_CLIENT_ID: z.string().min(1),
 	TWITCH_CLIENT_SECRET: z.string().min(1),
 
-	// AT Proto OAuth needs to know our own public URL + where to bounce users.
-	PUBLIC_URL: z.string().url(),
-	ATPROTO_LOGIN_REDIRECT: z.string().url(),
-
-	// Secret used to sign the session cookie (so users can't forge their DID).
-	// Generate with: openssl rand -hex 32
-	COOKIE_SECRET: z.string().min(16),
-
 	NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 })
 

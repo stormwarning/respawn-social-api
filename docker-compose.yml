@@ -1,0 +1,32 @@
+# Local development: Postgres only.
+#
+# The app itself runs natively (`deno task dev`) for fast watch-reload. This
+# compose file just provides the database it talks to. Start it with:
+#
+#   docker compose up -d db
+#
+# The default credentials below match DATABASE_URL in .env.example:
+#   postgres://postgres:postgres@localhost:5433/respawn
+#
+# Host port is 5433 (not 5432) to avoid clashing with a native Postgres install
+# that may already own 5432.
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: respawn
+    ports:
+      - '5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

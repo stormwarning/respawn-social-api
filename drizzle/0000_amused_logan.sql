@@ -1,15 +1,3 @@
-CREATE TABLE "atproto_auth_state" (
-	"key" text PRIMARY KEY NOT NULL,
-	"state" jsonb NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE "atproto_session" (
-	"did" text PRIMARY KEY NOT NULL,
-	"session" jsonb NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
 CREATE TABLE "games" (
 	"id" bigint PRIMARY KEY NOT NULL,
 	"payload" jsonb NOT NULL,
@@ -29,5 +17,3 @@ CREATE TABLE "search_cache" (
 	"fetched_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"expires_at" timestamp with time zone NOT NULL
 );
---> statement-breakpoint
-CREATE INDEX "atproto_session_updated_idx" ON "atproto_session" USING btree ("updated_at");

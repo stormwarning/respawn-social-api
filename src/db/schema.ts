@@ -1,4 +1,4 @@
-import { bigint, index, jsonb, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
+import { bigint, jsonb, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
 
 /**
  * Database schema (Drizzle).
@@ -57,34 +57,3 @@ export const oauthToken = pgTable('oauth_token', {
 	// When the token becomes invalid (so we refresh slightly before).
 	expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
 })
-
-/**
- * AT Protocol OAuth — transient "state" store.
- *
- * Backend concept: OAuth is a multi-step redirect dance. Between "user clicks
- * login" and "user comes back from their PDS", we must remember some per-request
- * data (PKCE verifier, DPoP key, etc). The AT Proto client hands us a key+value
- * to stash; we give it back on return. Short-lived rows.
- */
-export const atprotoAuthState = pgTable('atproto_auth_state', {
-	key: text('key').primaryKey(),
-	state: jsonb('state').notNull(),
-	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
-
-/**
- * AT Protocol OAuth — durable user sessions.
- *
- * Once a user logs in, the client stores their session (tokens + DPoP key) here
- * keyed by their DID (their permanent AT Proto identifier). This is what lets us
- * act on their behalf (e.g. write a game post to their PDS) on later requests.
- */
-export const atprotoSession = pgTable(
-	'atproto_session',
-	{
-		did: text('did').primaryKey(),
-		session: jsonb('session').notNull(),
-		updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-	},
-	(t) => [index('atproto_session_updated_idx').on(t.updatedAt)],
-)

@@ -3,7 +3,6 @@ import { cors } from 'hono/cors'
 import { config } from './config.js'
 import { logger } from './logger.js'
 import { gamesRoutes } from './routes/games.js'
-import { authRoutes } from './routes/auth.js'
 
 const app = new Hono()
 
@@ -13,7 +12,7 @@ const app = new Hono()
  * Backend concept: browsers block a page on origin A from reading responses
  * from origin B unless B explicitly opts in. Our front-end (e.g. localhost:5173)
  * and this API (localhost:3000) are different origins, so we must whitelist the
- * front-end here. `credentials: true` lets the browser send our session cookie.
+ * front-end here.
  *
  * (Note: this is also exactly why the browser can't call IGDB directly — IGDB
  * does NOT send these headers. So all IGDB traffic is proxied through us.)
@@ -22,7 +21,6 @@ app.use(
 	'*',
 	cors({
 		origin: config.ALLOWED_ORIGINS,
-		credentials: true,
 	}),
 )
 
@@ -37,7 +35,6 @@ app.get('/health', (c) => c.json({ status: 'ok', uptime: process.uptime() }))
 
 // Feature routes.
 app.route('/games', gamesRoutes) // IGDB-backed game data (cached)
-app.route('/auth', authRoutes) // AT Proto OAuth login/session
 
 /**
  * Fallback handlers.

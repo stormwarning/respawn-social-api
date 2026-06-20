@@ -1,16 +1,12 @@
 # respawn-social-backend
 
-Backend service for a game-focused social app built on the **AT Protocol**.
-Its two jobs:
+One job: **proxy + cache the [IGDB](https://www.igdb.com) game API** so we never
+exceed IGDB's strict rate limit (4 requests/second, shared across _all_ users).
 
-1. **Proxy + cache the [IGDB](https://www.igdb.com) game API** so we never exceed
-   IGDB's strict rate limit (4 requests/second, shared across _all_ users).
-2. **Handle AT Protocol login** (OAuth) so users can sign in with their existing
-   AT Proto / Bluesky identity.
-
-The front-end (a separate app) talks only to this service — never to IGDB
-directly (IGDB blocks browser requests, and the API credentials must stay
-server-side).
+The front-end (the [Respawn Svelte app](https://tangled.org/tidaltheory.io/respawn-social-web),
+which also handles all AT Protocol / Bluesky login) talks to this service for
+game data — never to IGDB directly (IGDB blocks browser requests, and the API
+credentials must stay server-side).
 
 ---
 
@@ -26,8 +22,8 @@ games are fetched from IGDB essentially **once, ever**.
 
 ```
 [ Front-end ] --HTTP/JSON--> [ THIS SERVICE ] --rate-limited--> [ IGDB ]
-                                   |          \--OAuth--------> [ AT Proto PDS ]
-                              Postgres (cache + sessions)
+                                   |
+                              Postgres (game cache + token)
 ```
 
 ---
@@ -51,16 +47,11 @@ src/
     data.ts           Read-through cache: getGame() / searchGames() with
                       stale-while-revalidate + request dedup.
 
-  atproto/            === AT Protocol login ===
-    store.ts          Postgres-backed OAuth state + session stores.
-    client.ts         The configured AT Proto OAuth client.
-
   lib/
     single-flight.ts  Helper: dedupe identical concurrent requests.
 
   routes/
     games.ts          GET /games/:id, GET /games/search
-    auth.ts           GET /auth/login, /auth/callback, /auth/me, POST /auth/logout
 ```
 
 Most files have inline comments explaining the backend concept they implement.
@@ -81,28 +72,37 @@ Most files have inline comments explaining the backend concept they implement.
 
 ```bash
 deno install                  # installs npm deps into node_modules
-cp .env.example .env          # then fill in the values
-# generate a cookie secret:
-openssl rand -hex 32          # paste into COOKIE_SECRET in .env
+cp .env.example .env          # then fill in your Twitch client id + secret
 ```
 
-Create the database tables:
+---
+
+## Local development
+
+Postgres runs in Docker; the app runs natively for fast watch-reload.
 
 ```bash
-deno task db:migrate          # applies the SQL in ./drizzle
+docker compose up -d db       # start Postgres (creates the `respawn` database)
+deno task db:migrate          # apply the SQL in ./drizzle (creates the tables)
+deno task dev                 # run the API in watch mode
 ```
+
+The default `DATABASE_URL` in `.env.example`
+(`postgres://postgres:postgres@localhost:5433/respawn`) already matches the
+compose service, so no extra config is needed. (Host port is **5433** to avoid
+clashing with any native Postgres already running on 5432.)
 
 > If you change `src/db/schema.ts`, regenerate the migration with
 > `deno task db:generate`, then run `deno task db:migrate` again.
 
+To stop the database: `docker compose down` (add `-v` to also wipe the data).
+
 ---
 
-## Running
+## Running (production)
 
 ```bash
-deno task dev                 # watch mode (auto-restart on change)
-# or
-deno task start               # run once (production)
+deno task start               # run once (no watch)
 ```
 
 The server listens on `PORT` (default 3000).
@@ -132,11 +132,6 @@ deno task format              # format with oxfmt
 | GET    | `/health`                     | Liveness check.                              |
 | GET    | `/games/:id`                  | A single game by IGDB id (cached).           |
 | GET    | `/games/search?q=zelda`       | Search games by title (cached).              |
-| GET    | `/auth/login?handle=<handle>` | Start AT Proto login (redirects to the PDS). |
-| GET    | `/auth/callback`              | OAuth redirect target (handled for you).     |
-| GET    | `/auth/me`                    | Current user, or 401.                        |
-| POST   | `/auth/logout`                | End the session.                             |
-| GET    | `/auth/client-metadata.json`  | AT Proto client document (prod).             |
 
 Quick check:
 
@@ -166,12 +161,11 @@ curl "localhost:3000/games/search?q=hollow%20knight"
   — the in-memory rate limiter and token cache need a persistent process.
 - A `Dockerfile` is included (based on the official `denoland/deno` image; Deno
   runs the TypeScript directly, so there's no compile step).
-- Set all `.env` values as platform secrets. `PUBLIC_URL` must be your real
-  public `https://` URL in production (it drives the AT Proto OAuth redirect and
-  the `client-metadata.json` `client_id`).
-- Single instance is assumed. To run **multiple** instances you'll want a shared
-  cache/lock (e.g. Redis) — see the `requestLock` note in `src/atproto/client.ts`
-  and the in-memory token cache in `src/igdb/token.ts`.
+- Set all `.env` values as platform secrets. Set `ALLOWED_ORIGINS` to your
+  front-end's real origin(s).
+- Single instance is assumed. The in-memory rate limiter and token cache
+  (`src/igdb/client.ts`, `src/igdb/token.ts`) live in the process; to run
+  **multiple** instances you'd want a shared cache/lock (e.g. Redis).
 
 ## Note on IGDB usage terms
 
