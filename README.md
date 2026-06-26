@@ -127,11 +127,11 @@ deno task format              # format with oxfmt
 
 ## Endpoints
 
-| Method | Path                          | Description                                  |
-| ------ | ----------------------------- | -------------------------------------------- |
-| GET    | `/health`                     | Liveness check.                              |
-| GET    | `/games/:id`                  | A single game by IGDB id (cached).           |
-| GET    | `/games/search?q=zelda`       | Search games by title (cached).              |
+| Method | Path                    | Description                        |
+| ------ | ----------------------- | ---------------------------------- |
+| GET    | `/health`               | Liveness check.                    |
+| GET    | `/games/:id`            | A single game by IGDB id (cached). |
+| GET    | `/games/search?q=zelda` | Search games by title (cached).    |
 
 Quick check:
 

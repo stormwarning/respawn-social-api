@@ -6,6 +6,7 @@
     "npm:drizzle-kit@0.31.10": "0.31.10",
     "npm:drizzle-orm@0.45.2": "0.45.2_postgres@3.4.9",
     "npm:hono@4.12.26": "4.12.26",
+    "npm:oxfmt@*": "0.55.0",
     "npm:oxfmt@0.55.0": "0.55.0",
     "npm:oxlint@1.70.0": "1.70.0",
     "npm:p-queue@9.3.0": "9.3.0",

@@ -37,7 +37,11 @@ gamesRoutes.get('/search', async (c) => {
 
 // GET /games/slug/:slug
 // (defined before /:id so "slug" isn't captured as an id)
-const slugSchema = z.string().min(1).max(120).regex(/^[a-z0-9-]+$/, 'invalid slug')
+const slugSchema = z
+	.string()
+	.min(1)
+	.max(120)
+	.regex(/^[a-z0-9-]+$/, 'invalid slug')
 
 gamesRoutes.get('/slug/:slug', async (c) => {
 	const parsed = slugSchema.safeParse(c.req.param('slug'))
