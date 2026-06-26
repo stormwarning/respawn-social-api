@@ -29,7 +29,7 @@ const SEARCH_TTL_MS = 6 * 60 * 60 * 1000 // 6 hours
 
 // The fields we want IGDB to return for a game. Tweak as the front-end needs.
 const GAME_FIELDS =
-	'name,slug,summary,storyline,first_release_date,rating,cover.image_id,genres.name,platforms.name,involved_companies.company.name,screenshots.image_id,checksum'
+	'name,slug,url,summary,first_release_date,rating,cover.url,genres.name,platforms.name,involved_companies.company.name,involved_companies.publisher,involved_companies.developer,websites.url,websites.type.type,similar_games.id,similar_games.name,similar_games.cover.url,similar_games.platforms.name,checksum'
 
 export interface IgdbGame {
 	id: number
@@ -65,7 +65,12 @@ async function upsertGame(game: IgdbGame): Promise<void> {
 		.values(row)
 		.onConflictDoUpdate({
 			target: games.id,
-			set: { slug: row.slug, payload: row.payload, checksum: row.checksum, fetchedAt: new Date() },
+			set: {
+				slug: row.slug,
+				payload: row.payload,
+				checksum: row.checksum,
+				fetchedAt: new Date(),
+			},
 		})
 }
 
