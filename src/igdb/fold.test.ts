@@ -52,7 +52,7 @@ Deno.test('foldRelations collapses ports, dlcs, expansions, remasters + versions
 	const base: IgdbGame = {
 		id: 100,
 		name: 'Base Game',
-		category: Category.MAIN_GAME,
+		game_type: Category.MAIN_GAME,
 		platforms: [{ id: 1, name: 'PC' }],
 		ports: [200],
 		dlcs: [300, 700], // 700 is a PACK -> must be skipped
@@ -62,20 +62,20 @@ Deno.test('foldRelations collapses ports, dlcs, expansions, remasters + versions
 		200: {
 			id: 200,
 			name: 'PS5 Port',
-			category: Category.PORT,
+			game_type: Category.PORT,
 			platforms: [{ id: 2, name: 'PS5' }],
 		},
 		300: {
 			id: 300,
 			name: 'DLC One',
-			category: Category.DLC_ADDON,
+			game_type: Category.DLC_ADDON,
 			platforms: [{ id: 3, name: 'Xbox' }],
 			cover: { url: 'cover-dlc' },
 		},
 		400: {
 			id: 400,
 			name: 'Expansion A',
-			category: Category.EXPANSION,
+			game_type: Category.EXPANSION,
 			platforms: [{ id: 1, name: 'PC' }], // duplicate platform -> dedup
 			cover: { url: 'cover-exp' },
 			remasters: [500], // recursion: remaster of an expansion
@@ -83,14 +83,14 @@ Deno.test('foldRelations collapses ports, dlcs, expansions, remasters + versions
 		500: {
 			id: 500,
 			name: 'Remaster X',
-			category: Category.REMASTER,
+			game_type: Category.REMASTER,
 			platforms: [{ id: 4, name: 'Switch' }],
 			cover: { url: 'cover-rem' },
 		},
 		700: {
 			id: 700,
 			name: 'Some Pack',
-			category: Category.PACK,
+			game_type: Category.PACK,
 			platforms: [{ id: 9, name: 'Nope' }],
 		},
 	}
@@ -118,7 +118,7 @@ Deno.test('foldRelations on a relation-less game just adds empty fold fields', a
 	const base: IgdbGame = {
 		id: 1,
 		name: 'Lonely Game',
-		category: Category.MAIN_GAME,
+		game_type: Category.MAIN_GAME,
 		platforms: [{ id: 1, name: 'PC' }],
 	}
 	const { request } = mockRequest({})
@@ -131,12 +131,12 @@ Deno.test('foldRelations on a relation-less game just adds empty fold fields', a
 })
 
 Deno.test('resolveRootGame walks a DLC up to its base title', async () => {
-	const base: IgdbGame = { id: 100, name: 'Base Game', category: Category.MAIN_GAME }
+	const base: IgdbGame = { id: 100, name: 'Base Game', game_type: Category.MAIN_GAME }
 	const graph: Record<number, IgdbGame> = { 100: base }
 	const dlc: IgdbGame = {
 		id: 300,
 		name: 'DLC One',
-		category: Category.DLC_ADDON,
+		game_type: Category.DLC_ADDON,
 		parent_game: 100,
 	}
 
@@ -148,18 +148,18 @@ Deno.test('resolveRootGame walks a DLC up to its base title', async () => {
 
 Deno.test('resolveRootGame prefers version_parent then chains parent_game', async () => {
 	// remaster(500) -> version_parent expansion(400) -> parent_game base(100)
-	const base: IgdbGame = { id: 100, name: 'Base Game', category: Category.MAIN_GAME }
+	const base: IgdbGame = { id: 100, name: 'Base Game', game_type: Category.MAIN_GAME }
 	const expansion: IgdbGame = {
 		id: 400,
 		name: 'Expansion A',
-		category: Category.EXPANSION,
+		game_type: Category.EXPANSION,
 		parent_game: 100,
 	}
 	const graph: Record<number, IgdbGame> = { 100: base, 400: expansion }
 	const remaster: IgdbGame = {
 		id: 500,
 		name: 'Remaster X',
-		category: Category.REMASTER,
+		game_type: Category.REMASTER,
 		version_parent: 400,
 	}
 
@@ -169,7 +169,7 @@ Deno.test('resolveRootGame prefers version_parent then chains parent_game', asyn
 })
 
 Deno.test('resolveRootGame leaves a "separate" title untouched', async () => {
-	const fork: IgdbGame = { id: 50, name: 'A Fork', category: Category.FORK, parent_game: 100 }
+	const fork: IgdbGame = { id: 50, name: 'A Fork', game_type: Category.FORK, parent_game: 100 }
 	const { request, calls } = mockRequest({ 100: { id: 100, name: 'Base' } })
 	const root = await resolveRootGame(fork, request)
 	assertEquals(root.id, 50) // forks keep their own row -> no walk-up
@@ -178,8 +178,8 @@ Deno.test('resolveRootGame leaves a "separate" title untouched', async () => {
 
 Deno.test('resolveRootGame survives a parent cycle without looping forever', async () => {
 	// a(1) -> parent b(2) -> parent a(1)
-	const a: IgdbGame = { id: 1, name: 'A', category: Category.DLC_ADDON, parent_game: 2 }
-	const b: IgdbGame = { id: 2, name: 'B', category: Category.DLC_ADDON, parent_game: 1 }
+	const a: IgdbGame = { id: 1, name: 'A', game_type: Category.DLC_ADDON, parent_game: 2 }
+	const b: IgdbGame = { id: 2, name: 'B', game_type: Category.DLC_ADDON, parent_game: 1 }
 	const { request } = mockRequest({ 1: a, 2: b })
 	const root = await resolveRootGame(a, request)
 	// Walks a->b, then b->a is already seen, so it stops at b. Just assert it returns.

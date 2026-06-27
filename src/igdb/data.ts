@@ -153,7 +153,7 @@ async function fetchAndStoreSearch(normalized: string): Promise<IgdbGame[]> {
 		// Only surface primary + "keep as separate" titles (main, standalone
 		// expansion, remake, expanded game, fork). Foldable + never-show types
 		// are excluded from search/nav.
-		`search "${safe}"; fields ${GAME_FIELDS}; where version_parent = null & category = (0,4,8,10,12); limit 20;`,
+		`search "${safe}"; fields ${GAME_FIELDS}; where version_parent = null & game_type = (0,4,8,10,12); limit 20;`,
 	)
 
 	const now = new Date()

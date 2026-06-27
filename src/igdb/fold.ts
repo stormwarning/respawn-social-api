@@ -22,7 +22,7 @@ export interface IgdbGame {
 	name?: string
 	slug?: string
 	checksum?: string
-	category?: number
+	game_type?: number
 	parent_game?: number
 	version_parent?: number
 	version_title?: string
@@ -52,17 +52,18 @@ export interface IgdbGame {
 export type IgdbRequestFn = <T = unknown>(endpoint: string, body: string) => Promise<T>
 
 // The fields we want IGDB to return for a game. Tweak as the front-end needs.
-// Includes the relation/category fields the fold layer needs to collapse
+// Includes the relation/game_type fields the fold layer needs to collapse
 // related titles (ports, dlcs, expansions, remasters, versions) into the base.
 export const GAME_FIELDS =
-	'name,slug,url,summary,first_release_date,rating,cover.url,genres.name,platforms.id,platforms.name,involved_companies.company.name,involved_companies.publisher,involved_companies.developer,websites.url,websites.type.type,similar_games.id,similar_games.name,similar_games.cover.url,similar_games.platforms.name,checksum,category,parent_game,version_parent,version_title,dlcs,expansions,standalone_expansions,expanded_games,forks,ports,remakes,remasters,bundles'
+	'name,slug,url,summary,first_release_date,rating,cover.url,genres.name,platforms.id,platforms.name,involved_companies.company.name,involved_companies.publisher,involved_companies.developer,websites.url,websites.type.type,similar_games.id,similar_games.name,similar_games.cover.url,similar_games.platforms.name,checksum,game_type,parent_game,version_parent,version_title,dlcs,expansions,standalone_expansions,expanded_games,forks,ports,remakes,remasters,bundles'
 
 // Lighter field set for related games we only fetch to fold into a base title.
 const RELATED_FIELDS =
-	'name,cover.url,platforms.id,platforms.name,category,version_parent,version_title,dlcs,expansions,standalone_expansions,expanded_games,forks,ports,remakes,remasters,bundles,parent_game'
+	'name,cover.url,platforms.id,platforms.name,game_type,version_parent,version_title,dlcs,expansions,standalone_expansions,expanded_games,forks,ports,remakes,remasters,bundles,parent_game'
 
 /**
- * IGDB `category` enum (legacy int). We use it to classify a game on direct
+ * IGDB `game_type` enum (int). Formerly the `category` field, which IGDB renamed
+ * to `game_type` (same numeric values). We use it to classify a game on direct
  * lookup and to filter search results.
  */
 export const Category = {
@@ -136,7 +137,7 @@ export async function resolveRootGame(game: IgdbGame, request: IgdbRequestFn): P
 	let current = game
 
 	// Loop while the current game is a foldable/never type and points upward.
-	while (current.category !== undefined && !SEPARATE_CATEGORIES.has(current.category)) {
+	while (current.game_type !== undefined && !SEPARATE_CATEGORIES.has(current.game_type)) {
 		const parentId = current.version_parent ?? current.parent_game
 		if (typeof parentId !== 'number' || seen.has(parentId)) break
 		seen.add(parentId)
@@ -207,7 +208,7 @@ export async function foldRelations(root: IgdbGame, request: IgdbRequestFn): Pro
 		const children = await fetchGamesByIds(ids, request)
 		for (const child of children) {
 			// Skip anything we never ingest, even if reached via a relation array.
-			if (child.category !== undefined && NEVER_CATEGORIES.has(child.category)) continue
+			if (child.game_type !== undefined && NEVER_CATEGORIES.has(child.game_type)) continue
 
 			const fold = foldById.get(child.id)
 			mergePlatforms(child.platforms)
