@@ -54,8 +54,14 @@ export type IgdbRequestFn = <T = unknown>(endpoint: string, body: string) => Pro
 // The fields we want IGDB to return for a game. Tweak as the front-end needs.
 // Includes the relation/game_type fields the fold layer needs to collapse
 // related titles (ports, dlcs, expansions, remasters, versions) into the base.
-export const GAME_FIELDS =
-	'name,slug,url,summary,first_release_date,rating,cover.url,genres.name,platforms.id,platforms.name,involved_companies.company.name,involved_companies.publisher,involved_companies.developer,websites.url,websites.type.type,similar_games.id,similar_games.name,similar_games.cover.url,similar_games.platforms.name,checksum,game_type,parent_game,version_parent,version_title,dlcs,expansions,standalone_expansions,expanded_games,forks,ports,remakes,remasters,bundles'
+export const GAME_FIELDS = [
+	'name,slug,url,summary,first_release_date,rating,cover.url,checksum',
+	'genres.name,platforms.id,platforms.name',
+	'involved_companies.company.name,involved_companies.publisher,involved_companies.developer',
+	'websites.url,websites.type.type,external_games.url,external_games.external_game_source.name',
+	'similar_games.id,similar_games.name,similar_games.cover.url,similar_games.platforms.name',
+	'game_type,parent_game,version_parent,version_title,dlcs,expansions,standalone_expansions,expanded_games,forks,ports,remakes,remasters,bundles',
+].join(',')
 
 // Lighter field set for related games we only fetch to fold into a base title.
 const RELATED_FIELDS =
