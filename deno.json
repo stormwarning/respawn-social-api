@@ -8,6 +8,7 @@
 		"dev": "deno run --watch --env-file --allow-net --allow-env --allow-read --allow-sys src/index.ts",
 		"start": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys src/index.ts",
 		"typecheck": "deno check src/index.ts",
+		"test": "deno test",
 		"lint": "deno run -A npm:oxlint",
 		"format": "deno run -A npm:oxfmt",
 		"db:generate": "deno run -A npm:drizzle-kit generate",

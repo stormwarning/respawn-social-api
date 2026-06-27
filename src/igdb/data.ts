@@ -4,6 +4,9 @@ import { games, searchCache } from '../db/schema.js'
 import { logger } from '../logger.js'
 import { SingleFlight } from '../lib/single-flight.js'
 import { igdbRequest } from './client.js'
+import { foldRelations, GAME_FIELDS, type IgdbGame, resolveRootGame } from './fold.js'
+
+export type { IgdbGame }
 
 /**
  * IGDB data layer (the read-through cache).
@@ -26,18 +29,6 @@ import { igdbRequest } from './client.js'
 const GAME_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 // Search results are more volatile; cache them for a few hours.
 const SEARCH_TTL_MS = 6 * 60 * 60 * 1000 // 6 hours
-
-// The fields we want IGDB to return for a game. Tweak as the front-end needs.
-const GAME_FIELDS =
-	'name,slug,url,summary,first_release_date,rating,cover.url,genres.name,platforms.name,involved_companies.company.name,involved_companies.publisher,involved_companies.developer,websites.url,websites.type.type,similar_games.id,similar_games.name,similar_games.cover.url,similar_games.platforms.name,checksum'
-
-export interface IgdbGame {
-	id: number
-	name?: string
-	slug?: string
-	checksum?: string
-	[key: string]: unknown
-}
 
 // One single-flight registry per concern, so identical concurrent requests dedupe.
 const gameFlight = new SingleFlight<IgdbGame | null>()
@@ -79,8 +70,12 @@ async function fetchAndStoreGame(id: number): Promise<IgdbGame | null> {
 	const rows = await igdbRequest<IgdbGame[]>('games', `fields ${GAME_FIELDS}; where id = ${id};`)
 	const game = rows[0]
 	if (!game) return null
-	await upsertGame(game)
-	return game
+	// Resolve foldable/never types up to their primary title, then collapse
+	// related titles into it before storing.
+	const root = await resolveRootGame(game, igdbRequest)
+	const folded = await foldRelations(root, igdbRequest)
+	await upsertGame(folded)
+	return folded
 }
 
 /** Pull a single game from IGDB (by slug) and upsert it into the mirror. */
@@ -93,8 +88,10 @@ async function fetchAndStoreGameBySlug(slug: string): Promise<IgdbGame | null> {
 	)
 	const game = rows[0]
 	if (!game) return null
-	await upsertGame(game)
-	return game
+	const root = await resolveRootGame(game, igdbRequest)
+	const folded = await foldRelations(root, igdbRequest)
+	await upsertGame(folded)
+	return folded
 }
 
 /**
@@ -153,7 +150,10 @@ async function fetchAndStoreSearch(normalized: string): Promise<IgdbGame[]> {
 	const safe = normalized.replace(/"/g, '\\"')
 	const results = await igdbRequest<IgdbGame[]>(
 		'games',
-		`search "${safe}"; fields ${GAME_FIELDS}; where version_parent = null; limit 20;`,
+		// Only surface primary + "keep as separate" titles (main, standalone
+		// expansion, remake, expanded game, fork). Foldable + never-show types
+		// are excluded from search/nav.
+		`search "${safe}"; fields ${GAME_FIELDS}; where version_parent = null & category = (0,4,8,10,12); limit 20;`,
 	)
 
 	const now = new Date()
