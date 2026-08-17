@@ -59,7 +59,7 @@ export const GAME_FIELDS = [
 	'genres.name,platforms.id,platforms.name',
 	'involved_companies.company.name,involved_companies.publisher,involved_companies.developer',
 	'websites.url,websites.type.type,external_games.url,external_games.external_game_source.name',
-	'similar_games.id,similar_games.name,similar_games.cover.url,similar_games.platforms.name',
+	'similar_games.id,similar_games.name,similar_games.slug,similar_games.cover.url,similar_games.platforms.name',
 	'game_type,parent_game,version_parent,version_title,dlcs,expansions,standalone_expansions,expanded_games,forks,ports,remakes,remasters,bundles',
 ].join(',')
 
