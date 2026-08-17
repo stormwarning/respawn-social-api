@@ -65,8 +65,13 @@ async function upsertGame(game: IgdbGame): Promise<void> {
 		})
 }
 
-/** Pull a single game from IGDB (by id) and upsert it into the mirror. */
-async function fetchAndStoreGame(id: number): Promise<IgdbGame | null> {
+/**
+ * Pull a single game from IGDB (by id) and upsert it into the mirror.
+ *
+ * Exported for the backfill script, which re-runs every mirrored row through
+ * this path after GAME_FIELDS / the fold layer changes.
+ */
+export async function fetchAndStoreGame(id: number): Promise<IgdbGame | null> {
 	const rows = await igdbRequest<IgdbGame[]>('games', `fields ${GAME_FIELDS}; where id = ${id};`)
 	const game = rows[0]
 	if (!game) return null

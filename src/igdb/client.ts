@@ -19,11 +19,12 @@ import { getAccessToken, invalidateToken } from './token.js'
 
 const IGDB_BASE_URL = 'https://api.igdb.com/v4'
 
-// p-queue paces our outgoing requests. We deliberately set 3/sec (not 4) to
-// leave headroom for clock skew / retries, and cap concurrency at 8 (IGDB's max
-// open-requests limit).
+// p-queue paces our outgoing requests. We deliberately default to 3/sec (not 4)
+// to leave headroom for clock skew / retries, and cap concurrency at 8 (IGDB's
+// max open-requests limit). The rate is env-tunable (IGDB_RATE_CAP) so a second
+// process sharing the global limit can pace itself lower.
 const queue = new PQueue({
-	intervalCap: 3, // max requests...
+	intervalCap: config.IGDB_RATE_CAP, // max requests...
 	interval: 1000, // ...per 1000ms
 	concurrency: 8, // max simultaneously open
 })

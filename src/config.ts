@@ -30,6 +30,11 @@ const EnvSchema = z.object({
 	TWITCH_CLIENT_ID: z.string().min(1),
 	TWITCH_CLIENT_SECRET: z.string().min(1),
 
+	// Max IGDB requests per second for THIS process. IGDB's limit (4/s) is global
+	// to our credentials, so a second process (e.g. the backfill script) running
+	// alongside the server must lower its own cap to stay under the shared budget.
+	IGDB_RATE_CAP: z.coerce.number().int().min(1).max(4).default(3),
+
 	NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 })
 

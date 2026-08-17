@@ -13,6 +13,7 @@
 		"format": "deno run -A npm:oxfmt",
 		"db:generate": "deno run -A npm:drizzle-kit generate",
 		"db:migrate": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys src/db/migrate.ts",
+		"db:backfill": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys src/scripts/backfill-games.ts",
 		"db:studio": "deno run -A npm:drizzle-kit studio"
 	},
 
