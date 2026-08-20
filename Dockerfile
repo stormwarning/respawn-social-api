@@ -16,7 +16,7 @@ COPY . .
 # Pre-compile/cache the entry point so startup is fast and offline-capable.
 RUN deno cache src/index.ts
 
-EXPOSE 3000
+EXPOSE 8000
 
 # Run with the same explicit permissions as the `start` task.
 # (Deno denies network/env/fs access unless granted.)

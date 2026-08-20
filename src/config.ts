@@ -11,7 +11,7 @@ import { z } from 'zod'
  */
 
 const EnvSchema = z.object({
-	PORT: z.coerce.number().default(3000),
+	PORT: z.coerce.number().default(8000),
 
 	// CORS: which front-end origins may call this API. Comma-separated -> array.
 	ALLOWED_ORIGINS: z

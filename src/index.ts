@@ -11,7 +11,7 @@ const app = new Hono()
  *
  * Backend concept: browsers block a page on origin A from reading responses
  * from origin B unless B explicitly opts in. Our front-end (e.g. localhost:5173)
- * and this API (localhost:3000) are different origins, so we must whitelist the
+ * and this API (localhost:8000) are different origins, so we must whitelist the
  * front-end here.
  *
  * (Note: this is also exactly why the browser can't call IGDB directly — IGDB

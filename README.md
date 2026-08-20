@@ -105,7 +105,7 @@ To stop the database: `docker compose down` (add `-v` to also wipe the data).
 deno task start               # run once (no watch)
 ```
 
-The server listens on `PORT` (default 3000).
+The server listens on `PORT` (default 8000).
 
 > **Deno permissions:** the tasks grant explicit access flags
 > (`--allow-net`, `--allow-env`, `--allow-read`, `--allow-sys`). Deno denies
@@ -136,8 +136,8 @@ deno task format              # format with oxfmt
 Quick check:
 
 ```bash
-curl localhost:3000/health
-curl "localhost:3000/games/search?q=hollow%20knight"
+curl localhost:8000/health
+curl "localhost:8000/games/search?q=hollow%20knight"
 ```
 
 ---
