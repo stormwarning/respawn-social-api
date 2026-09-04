@@ -42,6 +42,18 @@ src/
     client.ts         The Postgres connection pool + Drizzle client.
     migrate.ts        Applies SQL migrations (run on deploy).
 
+  derive/             === Canonical + overrides -> the titles we serve ===
+    fold.ts           Which title does a game belong to? (pure)
+    typeset.ts        Smart punctuation for display text (pure)
+    index.ts          deriveTitle(): one title row from a loaded subtree (pure)
+    graph.ts          The parent graph in memory; membership for every game
+    load.ts           Batch loading, so derive stays pure
+    write.ts          Bulk upsert of titles / members / terms
+
+  search/
+    normalize.ts      The one function both the search index and the user's
+                      query go through. If they diverge, search breaks silently.
+
   mirror/             === The local IGDB mirror ===
     endpoints.ts      What we mirror, and its types. Source of truth for the
                       generated schema, the staging DDL, and the drift guard.
@@ -125,6 +137,25 @@ other nine still load.
 gitignored (694 MB) and the presigned S3 URLs inside the saved metadata are
 stripped, because those URLs are credentials for the whole file.
 
+### Building the derived titles
+
+```bash
+deno task db:overrides                # load data/overrides/*.json
+deno task derive:all                  # rebuild every title (~70s for 310k)
+deno task derive:all -- --limit=200   # a slice, for iterating
+deno task derive:all -- --fresh       # truncate the derived tables first
+deno task derive:parity               # compare against the old cache
+```
+
+`derive:all` is safe to re-run: a title whose inputs have not changed is
+skipped via `source_hash`, so a second pass over unchanged data writes nothing.
+Editing anything in `data/overrides/` changes the overrides hash and so
+re-derives everything — that is deliberate, and it takes about a minute.
+
+Everything a human authors lives in `data/overrides/*.json`, never in the
+database: platform and genre display names, manual fold corrections, and
+per-title patches. Those files are the only place game data is hand-edited, so
+every correction has a diff, an author and a reason.
 
 ---
 

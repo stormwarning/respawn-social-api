@@ -7,6 +7,12 @@ import { bigint, integer, jsonb, pgTable, text, timestamp } from 'drizzle-orm/pg
 export * from './schema.mirror.js'
 
 /**
+ * Layers 2 and 3 — hand-authored overrides, and the derived tables the API
+ * actually serves.
+ */
+export * from './schema.derived.js'
+
+/**
  * Database schema (Drizzle).
  *
  * Backend concept: this file is the single source of truth for our tables.

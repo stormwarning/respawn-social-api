@@ -1,0 +1,13 @@
+{
+  "$comment": "Display names for IGDB genres. Only the awkward ones are listed; anything absent renders as IGDB wrote it. Edit, then run `deno task db:overrides` and `deno task derive:all`.",
+  "aliases": [
+    { "id": 11, "displayName": "Real-Time Strategy" },
+    { "id": 12, "displayName": "RPG" },
+    { "id": 13, "displayName": "Simulation" },
+    { "id": 14, "displayName": "Sports" },
+    { "id": 16, "displayName": "Turn-Based Strategy" },
+    { "id": 25, "displayName": "Hack & Slash" },
+    { "id": 26, "displayName": "Quiz" },
+    { "id": 35, "displayName": "Card & Board" }
+  ]
+}
