@@ -1,14 +1,14 @@
 {
 	"$comment": "Display names and ordering for IGDB platforms. `sortOrder` decides the order platforms appear on a title; anything unlisted sorts at 500, after everything named here, alphabetically. Edit, then run `deno task db:overrides` and `deno task derive:all`.",
 	"aliases": [
-		{ "id": 6, "displayName": "PC", "sortOrder": 10 },
-		{ "id": 14, "displayName": "Mac", "sortOrder": 11 },
+		{ "id": 6, "displayName": "Windows", "sortOrder": 10 },
+		{ "id": 14, "displayName": "macOS", "sortOrder": 11 },
 		{ "id": 3, "displayName": "Linux", "sortOrder": 12 },
 
 		{ "id": 167, "displayName": "PlayStation 5", "sortOrder": 20 },
-		{ "id": 169, "displayName": "Xbox Series X|S", "sortOrder": 21 },
-		{ "id": 508, "displayName": "Nintendo Switch 2", "sortOrder": 22 },
-		{ "id": 130, "displayName": "Nintendo Switch", "sortOrder": 23 },
+		{ "id": 169, "displayName": "Xbox Series", "sortOrder": 21 },
+		{ "id": 508, "displayName": "Switch 2", "sortOrder": 22 },
+		{ "id": 130, "displayName": "Switch", "sortOrder": 23 },
 
 		{ "id": 48, "displayName": "PlayStation 4", "sortOrder": 30 },
 		{ "id": 49, "displayName": "Xbox One", "sortOrder": 31 },
@@ -25,8 +25,8 @@
 
 		{ "id": 46, "displayName": "PlayStation Vita", "sortOrder": 60 },
 		{ "id": 38, "displayName": "PlayStation Portable", "sortOrder": 61 },
-		{ "id": 37, "displayName": "Nintendo 3DS", "sortOrder": 62 },
-		{ "id": 20, "displayName": "Nintendo DS", "sortOrder": 63 },
+		{ "id": 37, "displayName": "3DS", "sortOrder": 62 },
+		{ "id": 20, "displayName": "DS", "sortOrder": 63 },
 		{ "id": 24, "displayName": "Game Boy Advance", "sortOrder": 64 },
 		{ "id": 22, "displayName": "Game Boy Color", "sortOrder": 65 },
 		{ "id": 33, "displayName": "Game Boy", "sortOrder": 66 },
