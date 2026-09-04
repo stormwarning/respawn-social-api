@@ -46,6 +46,21 @@ Deno.test('typeset handles real IGDB titles', () => {
 	assertEquals(typeset('Half-Life 2: Episode One'), 'Half-Life 2: Episode One')
 })
 
+Deno.test('a matched single-quote pair is quotation, not two apostrophes', () => {
+	// Straight from the catalogue: The Witcher 3's DLC list.
+	assertEquals(
+		typeset("The Witcher 3: Wild Hunt - New Quest 'Contract: Skellige's Most Wanted'"),
+		'The Witcher 3: Wild Hunt – New Quest ‘Contract: Skellige’s Most Wanted’',
+	)
+	assertEquals(typeset("New Quest 'Fool's Gold'"), 'New Quest ‘Fool’s Gold’')
+	assertEquals(typeset("a 'quoted phrase' here"), 'a ‘quoted phrase’ here')
+})
+
+Deno.test('an unmatched single quote stays an apostrophe', () => {
+	assertEquals(typeset("'Splosion Man"), '’Splosion Man')
+	assertEquals(typeset("Players' Choice"), 'Players’ Choice')
+})
+
 Deno.test('typeset does not mangle version-range titles', () => {
 	assertEquals(typeset('FIFA 2019-2020 Season Update'), 'FIFA 2019–2020 Season Update')
 })

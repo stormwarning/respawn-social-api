@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { config } from './config.js'
 import { logger } from './logger.js'
 import { gamesRoutes } from './routes/games.js'
+import { mirrorHealth } from './titles/read.js'
 
 const app = new Hono()
 
@@ -31,7 +32,16 @@ app.use(
  * to know if the container is alive and ready to receive traffic. Keep it cheap
  * and dependency-free.
  */
-app.get('/health', (c) => c.json({ status: 'ok', uptime: process.uptime() }))
+app.get('/health', async (c) => {
+	// The mirror counts make a stalled dump loader visible from outside: if
+	// `lastDumpAt` stops moving, freshness has silently stopped.
+	try {
+		return c.json({ status: 'ok', uptime: process.uptime(), mirror: await mirrorHealth() })
+	} catch (err) {
+		logger.error(err, 'health check could not read the mirror')
+		return c.json({ status: 'degraded', uptime: process.uptime() }, 503)
+	}
+})
 
 // Feature routes.
 app.route('/games', gamesRoutes) // IGDB-backed game data (cached)

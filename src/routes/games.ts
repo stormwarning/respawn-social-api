@@ -1,42 +1,62 @@
+import type { Context } from 'hono'
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { getGame, getGameBySlug, searchGames } from '../igdb/data.js'
 import { logger } from '../logger.js'
+import { getTitleByGameId, getTitleBySlug, searchTitles, type Title } from '../titles/read.js'
 
 /**
  * Game routes.
  *
- * Backend concept: these are the public HTTP endpoints the front-end calls.
- * They are thin — all the heavy lifting (rate limiting, caching) lives in the
- * igdb data layer. A route's job is just: validate input -> call the service ->
- * shape the response.
+ * Thin by design: validate input, call the read layer, shape the response.
+ * Every one of these is served entirely from Postgres — the read layer folds
+ * nothing and computes nothing, because `derive:all` already did.
+ *
+ * Paths are unchanged from the IGDB-proxy era so existing clients keep
+ * resolving, but the response body is now a `Title` rather than a raw IGDB
+ * payload. `title.v` says which shape it is.
  */
 export const gamesRoutes = new Hono()
 
+/**
+ * A derived title only changes when a dump or webhook moves its inputs, so it
+ * is safe to cache hard and revalidate lazily. `source_hash` is a content hash
+ * of everything the title was built from, which makes it an honest ETag.
+ */
+function cacheable(c: Context, title: Title) {
+	c.header('Cache-Control', 'public, max-age=300, stale-while-revalidate=86400')
+	c.header('ETag', `"${title.sourceHash}"`)
+}
+
 // GET /games/search?q=zelda
-// (defined before /:id so "search" isn't captured as an id)
+// Declared before /:id so "search" is not captured as an id.
 const searchQuerySchema = z.object({
 	q: z.string().min(1, "query 'q' is required").max(100),
+	limit: z.coerce.number().int().min(1).max(50).default(20),
 })
 
 gamesRoutes.get('/search', async (c) => {
-	// Validate the query string. Invalid -> 400 with a helpful message.
-	const parsed = searchQuerySchema.safeParse({ q: c.req.query('q') })
+	const parsed = searchQuerySchema.safeParse({
+		q: c.req.query('q'),
+		limit: c.req.query('limit') ?? undefined,
+	})
 	if (!parsed.success) {
 		return c.json({ error: z.prettifyError(parsed.error) }, 400)
 	}
 
 	try {
-		const results = await searchGames(parsed.data.q)
+		const results = await searchTitles(parsed.data.q, parsed.data.limit)
+		// Searches are cheap and local now, but the same query from many users in
+		// a burst is still worth collapsing at the edge.
+		c.header('Cache-Control', 'public, max-age=60, stale-while-revalidate=600')
 		return c.json({ results })
 	} catch (err) {
 		logger.error(err, 'search failed')
-		return c.json({ error: 'Failed to search games' }, 502)
+		return c.json({ error: 'Failed to search games' }, 500)
 	}
 })
 
 // GET /games/slug/:slug
-// (defined before /:id so "slug" isn't captured as an id)
+// Declared before /:id so "slug" is not captured as an id.
 const slugSchema = z
 	.string()
 	.min(1)
@@ -50,16 +70,35 @@ gamesRoutes.get('/slug/:slug', async (c) => {
 	}
 
 	try {
-		const game = await getGameBySlug(parsed.data)
-		if (!game) return c.json({ error: 'Game not found' }, 404)
-		return c.json({ game })
+		const title = await getTitleBySlug(parsed.data)
+		if (!title) return c.json({ error: 'Game not found' }, 404)
+		cacheable(c, title)
+		return c.json({ title })
 	} catch (err) {
-		logger.error(err, `getGameBySlug(${parsed.data}) failed`)
-		return c.json({ error: 'Failed to fetch game' }, 502)
+		logger.error(err, `getTitleBySlug(${parsed.data}) failed`)
+		return c.json({ error: 'Failed to fetch game' }, 500)
 	}
 })
 
-// GET /games/:id
+// GET /games/:id/members — every IGDB id that resolves to this title.
+gamesRoutes.get('/:id/members', async (c) => {
+	const id = Number(c.req.param('id'))
+	if (!Number.isInteger(id) || id <= 0) {
+		return c.json({ error: 'id must be a positive integer' }, 400)
+	}
+
+	try {
+		const title = await getTitleByGameId(id)
+		if (!title) return c.json({ error: 'Game not found' }, 404)
+		c.header('Cache-Control', 'public, max-age=300, stale-while-revalidate=86400')
+		return c.json({ titleId: title.id, memberIds: title.members })
+	} catch (err) {
+		logger.error(err, `members(${id}) failed`)
+		return c.json({ error: 'Failed to fetch members' }, 500)
+	}
+})
+
+// GET /games/:id — accepts any IGDB game id, including a folded child's.
 gamesRoutes.get('/:id', async (c) => {
 	const id = Number(c.req.param('id'))
 	if (!Number.isInteger(id) || id <= 0) {
@@ -67,12 +106,12 @@ gamesRoutes.get('/:id', async (c) => {
 	}
 
 	try {
-		const game = await getGame(id)
-		if (!game) return c.json({ error: 'Game not found' }, 404)
-		return c.json({ game })
+		const title = await getTitleByGameId(id)
+		if (!title) return c.json({ error: 'Game not found' }, 404)
+		cacheable(c, title)
+		return c.json({ title })
 	} catch (err) {
-		logger.error(err, `getGame(${id}) failed`)
-		// 502 Bad Gateway: an upstream dependency (IGDB) failed, not the client.
-		return c.json({ error: 'Failed to fetch game' }, 502)
+		logger.error(err, `getTitleByGameId(${id}) failed`)
+		return c.json({ error: 'Failed to fetch game' }, 500)
 	}
 })

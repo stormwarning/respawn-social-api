@@ -17,8 +17,6 @@
 		"db:dumps": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys src/scripts/load-dumps.ts",
 		"db:overrides": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys src/scripts/load-overrides.ts",
 		"derive:all": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys src/scripts/derive-all.ts",
-		"derive:parity": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys src/scripts/parity.ts",
-		"db:backfill": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys src/scripts/backfill-games.ts",
 		"db:studio": "deno run -A npm:drizzle-kit studio"
 	},
 

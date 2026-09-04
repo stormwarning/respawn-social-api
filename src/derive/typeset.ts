@@ -19,6 +19,7 @@
 const EN_DASH = '–'
 const ELLIPSIS = '…'
 const APOSTROPHE = '’' // ’
+const LEFT_SINGLE = '‘' // ‘
 const LEFT_DOUBLE = '“' // “
 const RIGHT_DOUBLE = '”' // ”
 const PRIME = '′' // ′
@@ -51,11 +52,25 @@ export function typeset(text: string): string {
 	out = out.replace(/(^|[\s([{])"(?=\S)/g, `$1${LEFT_DOUBLE}`)
 	out = out.replaceAll('"', RIGHT_DOUBLE)
 
-	// Every remaining straight single quote becomes an apostrophe — we never
-	// emit an opening ‘. In game titles a leading straight quote is nearly
-	// always an elision ('90s, 'Splosion Man, 'Til Dawn) rather than a quoted
-	// word, and rendering those as ‘90s is worse than the rare quoted phrase
-	// coming out as ’word’.
+	// Apostrophes between letters first: possessives and contractions. Doing
+	// these before pair detection is what lets the pair below span them —
+	// 'Contract: Skellige's Most Wanted' has three straight quotes, and only the
+	// outer two are quotation.
+	out = out.replace(/([A-Za-z])'([A-Za-z])/g, `$1${APOSTROPHE}$2`)
+
+	// A matched pair around at least two characters is quotation, so it gets a
+	// real opening ‘. The two-character floor is doing the work: it keeps
+	// elisions like Rock 'n' Roll out, where treating the pair as quotation
+	// would give ‘n’ instead of ’n’.
+	out = out.replace(
+		/(^|[\s([{])'([^']{2,}?)'(?=[\s)\]}.,:;!?]|$)/g,
+		`$1${LEFT_SINGLE}$2${APOSTROPHE}`,
+	)
+
+	// Everything still straight becomes an apostrophe. In game titles a lone
+	// leading quote is nearly always an elision ('90s, 'Splosion Man, 'Til
+	// Dawn), and rendering those as ‘90s is worse than the rare unmatched
+	// quotation mark coming out as ’.
 	out = out.replaceAll("'", APOSTROPHE)
 
 	return out

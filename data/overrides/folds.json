@@ -1,4 +1,4 @@
 {
-  "$comment": "Manual corrections to fold decisions, consulted by resolveRoot before anything else. `fold_into` needs a targetGameId; `keep_separate` gives a game its own title despite IGDB folding it; `hide` drops it entirely. Every entry needs a note — a fold decision with no rationale cannot be reviewed later.",
-  "overrides": []
+	"$comment": "Manual corrections to fold decisions, consulted by resolveRoot before anything else. `fold_into` needs a targetGameId; `keep_separate` gives a game its own title despite IGDB folding it; `hide` drops it entirely. Every entry needs a note — a fold decision with no rationale cannot be reviewed later.",
+	"overrides": []
 }

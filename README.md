@@ -16,15 +16,19 @@ A browser **cannot** call IGDB: IGDB rejects cross-origin browser requests and
 requires a secret token. And IGDB's rate limit is _global_ to our credentials —
 if 50 users searched at once, 50 browser calls would instantly blow the limit.
 
-So this backend is the **single choke point**: it holds the token, paces all
-outgoing calls under the limit, and caches everything in Postgres so popular
-games are fetched from IGDB essentially **once, ever**.
+This service used to be a rate-limited proxy in front of IGDB. It no longer is.
+With Data Partner access we mirror IGDB's daily dumps into Postgres, derive the
+titles we actually serve, and answer every request locally — no IGDB call, no
+rate limit to respect, and search that understands our own fold.
 
 ```
-[ Front-end ] --HTTP/JSON--> [ THIS SERVICE ] --rate-limited--> [ IGDB ]
-                                   |
-                              Postgres (game cache + token)
+IGDB dumps (nightly) ──▶ [ canonical mirror ] ──▶ derive ──▶ [ titles ]
+                                                                  │
+                              [ Front-end ] ◀──HTTP/JSON──────────┘
 ```
+
+The one exception is a game id we have never mirrored, which is fetched live,
+mirrored, and derived on the spot.
 
 ---
 
@@ -61,17 +65,19 @@ src/
     load.ts           Streams a dump into staging, diffs on checksum, applies
                       only what changed. Never hard-deletes.
 
-  igdb/               === The "don't hammer IGDB" core ===
+  titles/
+    read.ts           The whole API read path. Every route is one or two
+                      indexed queries; nothing folds or computes at request
+                      time. Maps rows to the response shape, so the storage
+                      shape can change without touching the API contract.
+
+  igdb/               === Live IGDB, now nearly idle ===
     token.ts          Fetches/caches/refreshes the Twitch (IGDB) access token.
     client.ts         The rate-limited request queue (the 4 req/s gate) + retries.
-    data.ts           Read-through cache: getGame() / searchGames() with
-                      stale-while-revalidate + request dedup.
-
-  lib/
-    single-flight.ts  Helper: dedupe identical concurrent requests.
 
   routes/
-    games.ts          GET /games/:id, GET /games/search
+    games.ts          GET /games/:id, /games/slug/:slug, /games/:id/members,
+                      /games/search
 ```
 
 Most files have inline comments explaining the backend concept they implement.
@@ -157,6 +163,10 @@ database: platform and genre display names, manual fold corrections, and
 per-title patches. Those files are the only place game data is hand-edited, so
 every correction has a diff, an author and a reason.
 
+The overrides version is a hash of the _parsed_ files, not their text, so
+reindenting one or editing a `$comment` does not re-derive 309k titles. Changing
+what they actually say does.
+
 ---
 
 ## Running (production)
@@ -185,13 +195,30 @@ deno task format              # format with oxfmt
 
 ---
 
+## The read path
+
+Requests are served entirely from Postgres. There is exactly one code path left
+that calls IGDB during a request: a game id we have never mirrored, which can
+happen in the window between IGDB creating a game and our next dump. That path
+fetches the single game, mirrors it, derives its title, and serves it.
+
+`GET /games/:id` accepts **any** IGDB game id, including one that has since
+folded into a parent — a DLC, a port, a Collector's Edition. It resolves through
+`title_members` and returns the parent title with `resolvedFrom` set, so a saved
+record never 404s because IGDB reorganised its catalogue.
+
+Measured against the full 309k-title dataset: title reads are ~2 ms at p50,
+searches ~10 ms.
+
 ## Endpoints
 
-| Method | Path                    | Description                        |
-| ------ | ----------------------- | ---------------------------------- |
-| GET    | `/health`               | Liveness check.                    |
-| GET    | `/games/:id`            | A single game by IGDB id (cached). |
-| GET    | `/games/search?q=zelda` | Search games by title (cached).    |
+| Method | Path                    | Description                                            |
+| ------ | ----------------------- | ------------------------------------------------------ |
+| GET    | `/health`               | Liveness, plus mirror freshness and title count.       |
+| GET    | `/games/:id`            | A title by any IGDB game id, folded children included. |
+| GET    | `/games/slug/:slug`     | A title by slug.                                       |
+| GET    | `/games/:id/members`    | Every IGDB id that resolves to this title.             |
+| GET    | `/games/search?q=zelda` | Search, including folded DLC and alternative names.    |
 
 Quick check:
 
@@ -202,16 +229,30 @@ curl "localhost:8000/games/search?q=hollow%20knight"
 
 ---
 
-## How the caching works (in plain terms)
+## How the data gets there (in plain terms)
 
-- **Single game** (`getGame`): look in Postgres first. Fresh? return it (no IGDB
-  call). Stale? return the old copy _immediately_ and refresh in the background
-  ("stale-while-revalidate"). Missing? fetch from IGDB once and store it.
-- **Search** (`searchGames`): cached by normalized query for a few hours.
-- **Rate limit**: every IGDB call goes through one queue capped below 4 req/s, so
-  even a traffic spike just queues up instead of getting rejected (HTTP 429).
-- **Dedup**: if many users request the same uncached thing at once, only one
-  IGDB call is made; the rest await it.
+Three layers, and data only ever flows one way. See
+`docs/PLAN-igdb-mirror.md` for the full design.
+
+1. **Canonical** (`igdb_*`) — a straight mirror of IGDB's daily dumps, never
+   hand-edited. Rows are tombstoned, never deleted, because saved records point
+   at their ids.
+2. **Overrides** (`data/overrides/*.json`) — the only place a human writes game
+   data. Platform and genre display names, fold corrections, per-title patches.
+   In git, so every correction has a diff and a reason.
+3. **Derived** (`titles`, `title_members`, `title_terms`) — the output of a
+   pure function over the first two. This is what the API serves, and it can be
+   thrown away and rebuilt in about a minute.
+
+The interesting part is the fold. IGDB models a franchise as many separate game
+records — the base game, its DLC, its ports, its Collector's Edition — and we
+collapse all of that into one title. `title_members` records which ids fold
+where, which is what lets a record saved against a DLC keep resolving after
+IGDB reorganises around it.
+
+`title_terms` is the search index: the title's own name, its alternative names,
+and the names of everything folded into it. That is why searching "blood and
+wine" finds The Witcher 3 rather than nothing.
 
 ---
 
@@ -225,10 +266,17 @@ curl "localhost:8000/games/search?q=hollow%20knight"
   front-end's real origin(s).
 - Single instance is assumed. The in-memory rate limiter and token cache
   (`src/igdb/client.ts`, `src/igdb/token.ts`) live in the process; to run
-  **multiple** instances you'd want a shared cache/lock (e.g. Redis).
+  **multiple** instances you'd want a shared cache/lock (e.g. Redis). This
+  matters much less than it used to — reads touch IGDB not at all.
+- The database needs `pg_trgm` (migration `0005`) for search, and wants
+  `pg_trgm.word_similarity_threshold = 0.6` (migration `0006`, which degrades
+  to a `NOTICE` where the role cannot `ALTER DATABASE`).
+- Plan for ~2.8 GB of Postgres: 1.2 GB canonical, 1.6 GB derived.
 
 ## Note on IGDB usage terms
 
 IGDB is free for **non-commercial** use under the Twitch Developer Agreement.
-A commercial product needs a partner agreement (which also unlocks webhooks /
-data dumps — a great future upgrade to keep the cache warm with near-zero calls).
+A commercial product needs a partner agreement. We hold **Data Partner** access,
+which is what unlocks the dumps and webhooks this service is built on; IGDB's
+own FAQ prefers that partners store and serve the data themselves rather than
+proxying live calls, which is exactly what we now do.

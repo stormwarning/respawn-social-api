@@ -16,6 +16,13 @@ import * as schema from './schema.js'
  */
 const sql = postgres(config.DATABASE_URL, {
 	max: 10, // pool size
+	// IGDB writes UTC timestamps with no zone ("2015-05-19 00:00:00"), and
+	// Postgres resolves a bare datetime against the SESSION's TimeZone when
+	// casting to timestamptz. A per-statement `set time zone` is not enough —
+	// the pool hands out whichever connection is free — so it goes in the
+	// startup parameters, where every connection inherits it. Without this the
+	// same dump loads different release dates in dev and prod.
+	connection: { TimeZone: 'UTC' },
 	// Postgres NOTICEs ("table ... does not exist, skipping") are routine for the
 	// dump loader's idempotent DDL. Keep them out of stdout but not off the record.
 	onnotice: (notice) => logger.debug({ notice }, 'postgres notice'),

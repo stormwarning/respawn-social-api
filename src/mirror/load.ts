@@ -209,6 +209,8 @@ async function copyInto(
 		? await fetchBody(url)
 		: (await Deno.open(`${options.localDir}/${endpoint}.csv`)).readable
 
+	// The session's TimeZone decides how IGDB's bare "2015-05-19 00:00:00" casts
+	// to timestamptz. It is pinned to UTC for every connection in db/client.ts.
 	const writable = await sql
 		.unsafe(`copy ${quote(staging)} from stdin (format csv, header true)`)
 		.writable()

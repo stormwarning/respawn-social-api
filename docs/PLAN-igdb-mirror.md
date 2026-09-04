@@ -920,15 +920,64 @@ end to end but empty — the mechanism is tested, no real corrections are needed
 yet. `data/overrides/platforms.json` and `genres.json` carry a starting set of
 38 platform and 8 genre display names, which are an editorial call to revise.
 
-### Phase 3 — serve from derived
+### Phase 3 — serve from derived ✅ done 2026-09-03
 
-- Routes per §9. `/games/:id` on a child id returns the root title.
-- Unknown-id fallback (§5.5) works and is the only code path that calls
+- Routes per §9, served entirely from Postgres. `/games/:id` on a folded
+  child's id returns the root title with `resolvedFrom` set — verified with
+  116151 ("Hollow Knight: Collector's Edition") → 14593 (Hollow Knight).
+- Unknown-id fallback (§5.5) verified end to end by deleting a game from the
+  mirror and requesting it: live IGDB fetch → `upsertEntity` → `deriveOne` →
+  served, with the right release date. It is the only path that calls
   `igdbRequest` during a request.
-- `search` uses `title_terms`; the tuning queries in §8.3 return the expected
-  top result.
-- Old `games` and `search_cache` tables dropped; `backfill-games.ts` deleted.
-- Web app updated per §10 items 1–4 and 7.
+- `search` runs on `title_terms` with the §8.3 ranking. All eight tuning
+  queries return the expected top result.
+- `games` and `search_cache` dropped (migration 0007). `backfill-games.ts`,
+  `parity.ts`, `igdb/data.ts`, `igdb/fold.ts` and `lib/single-flight.ts`
+  deleted — the entire read-through cache is gone. `igdb/client.ts` and
+  `token.ts` remain for the fallback and the dump loader.
+- Web app updated per §10 items 1, 2, 3 and 7.
+
+**Measured on the full 309,568-title dataset:**
+
+| Operation              | p50     | p95     |
+| ---------------------- | ------- | ------- |
+| `GET /games/:id`       | 2.0 ms  | 3.9 ms  |
+| `GET /games/search?q=` | 10.5 ms | 20.4 ms |
+
+A title response is ~7.4 KB.
+
+**§10 item 4 is deferred to Phase 6, deliberately.** It moves cover-colour
+extraction out of the web app and into `GET /covers/:imageId/colors`, and that
+endpoint is Phase 6 work. Nothing in Phase 3 can land it, so `sharp` stays in
+`apps/web` for now.
+
+**Deviations and finds:**
+
+1. **`similar` needs quoting in SQL.** `SIMILAR` is a reserved keyword
+   (`SIMILAR TO`), so `select ..., similar, ...` is a syntax error rather than
+   a column reference. Only the derived layer hit this, because it is the only
+   place we select that column by name.
+2. **Timestamps were parsed as local time.** `new Date("2015-05-19 00:00:00")`
+   resolves a bare datetime against the LOCAL zone, so on a UTC-6 machine every
+   date landed six hours late — and dev and prod would have disagreed. Fixed in
+   `coerce`, and pinned for the SQL path too: `TimeZone: 'UTC'` is now a startup
+   parameter on the connection, because Postgres resolves a bare timestamp
+   against the _session's_ zone and a per-statement `set time zone` is
+   unreliable against a pool.
+3. **postgres.js cannot serialize a `Date` through its dynamic-object insert**
+   (`ERR_INVALID_ARG_TYPE`), nor accept a nested `sql.unsafe()` as a value.
+   `coerce` returns ISO strings and the upsert uses `sql(obj, ...keys)` in both
+   INSERT and SET position.
+4. **`deriveOne` walks a subtree instead of the whole graph.** `derive:all`
+   loads all 374k games to resolve roots in one pass, which no request can
+   afford. `src/derive/one.ts` walks the seed's ancestors, then the root's
+   descendants — a handful of small indexed queries. Phase 4's worker will use
+   the same function.
+5. **`igdbUrl` is derived, not stored.** The page needs a link to IGDB and
+   `titles` has no `url` column; it is built from the slug in the response
+   mapper.
+6. The response uses **camelCase** throughout, not the snake_case of §9's
+   sketch, matching the web app's existing conventions.
 
 ### Phase 4 — freshness
 
@@ -1003,10 +1052,15 @@ The denormalized columns account for most of it — `similar` 167 MB, `summary`
 * Keep `similar` as ids and resolve on read; 167 MB for a "you might also like"
   strip is the worst ratio in the table.
 
-None of this blocks Phase 3 — measure whether read latency actually needs the
-denormalization before spending the size. Note also that this does NOT change
-the local-first estimate in §11, which was always about a lite shard of
-id/slug/name/year/cover, not these rows.
+**Measured in Phase 3, and the answer is that the denormalization buys
+nothing.** `GET /games/:id` is 2.0 ms at p50 against the full dataset — a
+primary-key lookup plus one indexed member query. There is no latency budget
+being protected here, so the ~370 MB is available whenever it is worth an
+afternoon. `src/titles/read.ts` maps rows to the response shape explicitly, so
+this is a change to that one file and not to the API contract.
+
+Note also that this does NOT change the local-first estimate in §11, which was
+always about a lite shard of id/slug/name/year/cover, not these rows.
 
 ### 13.0 Phase 1, measured 2026-09-03
 

@@ -70,27 +70,35 @@ const PatchesFile = z.object({
 	),
 })
 
-async function readFile(name: string): Promise<{ raw: string; json: unknown }> {
-	const raw = await Deno.readTextFile(`${DIR}/${name}`)
-	return { raw, json: JSON.parse(raw) }
+async function readFile(name: string): Promise<unknown> {
+	return JSON.parse(await Deno.readTextFile(`${DIR}/${name}`))
 }
 
-const files = {
-	platforms: await readFile('platforms.json'),
-	genres: await readFile('genres.json'),
-	folds: await readFile('folds.json'),
-	patches: await readFile('patches.json'),
+const platforms = PlatformsFile.parse(await readFile('platforms.json'))
+const genres = GenresFile.parse(await readFile('genres.json'))
+const folds = FoldsFile.parse(await readFile('folds.json'))
+const patches = PatchesFile.parse(await readFile('patches.json'))
+
+/**
+ * Canonical JSON: keys sorted, no whitespace. Two files that mean the same
+ * thing hash the same however they are formatted.
+ */
+function canonical(value: unknown): string {
+	if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
+	if (value !== null && typeof value === 'object') {
+		return `{${Object.entries(value as Record<string, unknown>)
+			.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+			.map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`)
+			.join(',')}}`
+	}
+	return JSON.stringify(value)
 }
 
-const platforms = PlatformsFile.parse(files.platforms.json)
-const genres = GenresFile.parse(files.genres.json)
-const folds = FoldsFile.parse(files.folds.json)
-const patches = PatchesFile.parse(files.patches.json)
-
-// Hash the raw file text, not the parsed objects: a reformatted file that means
-// the same thing should not invalidate 309k titles.
+// Hash the PARSED overrides, not the file text. This version feeds
+// `titles.source_hash`, so anything it covers re-derives all 309k titles on the
+// next sweep — reindenting a file or editing a `$comment` should not do that.
 const version = createHash('sha256')
-	.update([files.platforms, files.genres, files.folds, files.patches].map((f) => f.raw).join('\0'))
+	.update(canonical([platforms, genres, folds, patches]))
 	.digest('hex')
 	.slice(0, 16)
 

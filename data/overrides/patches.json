@@ -1,4 +1,4 @@
 {
-  "$comment": "Per-title field overrides — the escape hatch that keeps special cases out of typeset() and derive. Allowed patch keys: displayName, summary, developers, publishers, firstReleaseDate. Every entry needs a note.",
-  "patches": []
+	"$comment": "Per-title field overrides — the escape hatch that keeps special cases out of typeset() and derive. Allowed patch keys: displayName, summary, developers, publishers, firstReleaseDate. Every entry needs a note.",
+	"patches": []
 }

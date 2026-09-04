@@ -21,7 +21,7 @@ import { typeset } from './typeset.js'
  * part of `source_hash`, so bumping it invalidates every title on the next
  * sweep without needing to work out which ones were affected.
  */
-export const DERIVE_VERSION = 2
+export const DERIVE_VERSION = 3
 
 export interface MemberGame {
 	id: number
