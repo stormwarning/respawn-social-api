@@ -210,9 +210,17 @@ happen in the window between IGDB creating a game and our next dump. That path
 fetches the single game, mirrors it, derives its title, and serves it.
 
 `GET /games/:id` accepts **any** IGDB game id, including one that has since
-folded into a parent — a DLC, a port, a Collector's Edition. It resolves through
-`title_members` and returns the parent title with `resolvedFrom` set, so a saved
-record never 404s because IGDB reorganised its catalogue.
+folded into a parent — a DLC, a port, a Collector's Edition — or one IGDB has
+deleted in favour of a duplicate. It resolves through `title_members`, then
+through a recorded redirect, and returns the surviving title with
+`resolvedFrom` set. A saved record never 404s because IGDB reorganised its
+catalogue.
+
+When IGDB deletes a game we keep the row, tombstone it, and try to work out what
+replaced it: an exact slug match, or the same normalized name and release year.
+Both require exactly one candidate — an ambiguous answer is left as a tombstone
+and logged, because a wrong redirect silently moves someone's rating onto a
+different game and nothing in the UI would show it.
 
 Measured against the full 309k-title dataset: title reads are ~2 ms at p50,
 searches ~10 ms.

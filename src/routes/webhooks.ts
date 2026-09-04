@@ -4,6 +4,7 @@ import { config } from '../config.js'
 import { markDirtyForIds, notifyDirty } from '../derive/dirty.js'
 import { logger } from '../logger.js'
 import { ENDPOINT_NAMES, type Endpoint } from '../mirror/endpoints.js'
+import { applyDeleteRedirect } from '../mirror/redirect.js'
 import { markDeleted, upsertEntity } from '../mirror/upsert.js'
 
 /**
@@ -84,6 +85,9 @@ webhooksRoutes.post('/igdb', async (c) => {
 		let changed: boolean
 		if (operation === 'delete') {
 			await markDeleted(endpoint, entityId)
+			// Work out what replaced it while we still have the row. Only games
+			// carry user records, so only games get the heuristic.
+			if (endpoint === 'games') await applyDeleteRedirect(entityId)
 			changed = true
 		} else {
 			changed = (await upsertEntity(endpoint, body)).changed

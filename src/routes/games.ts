@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { logger } from '../logger.js'
 import { getTitleByGameId, getTitleBySlug, searchTitles, type Title } from '../titles/read.js'
+import { resolveTitles } from '../titles/resolve.js'
 
 /**
  * Game routes.
@@ -52,6 +53,39 @@ gamesRoutes.get('/search', async (c) => {
 	} catch (err) {
 		logger.error(err, 'search failed')
 		return c.json({ error: 'Failed to search games' }, 500)
+	}
+})
+
+/**
+ * GET /games/resolve?ids=1,2,3
+ *
+ * Where do these saved ids point now? The web app calls this with a page of
+ * records at a time — a profile, a backlog — to group them by the title each
+ * one currently belongs to. Batched because one request per record would cost
+ * more than rendering the page.
+ */
+const MAX_RESOLVE_IDS = 200
+
+gamesRoutes.get('/resolve', async (c) => {
+	const raw = c.req.query('ids') ?? ''
+	const ids = raw
+		.split(',')
+		.map((part) => Number(part.trim()))
+		.filter((id) => Number.isInteger(id) && id > 0)
+
+	if (ids.length === 0) {
+		return c.json({ error: "query 'ids' must be a comma-separated list of game ids" }, 400)
+	}
+	if (ids.length > MAX_RESOLVE_IDS) {
+		return c.json({ error: `at most ${MAX_RESOLVE_IDS} ids per request` }, 400)
+	}
+
+	try {
+		const resolved = await resolveTitles(ids)
+		return c.json({ resolved: Object.fromEntries(resolved) })
+	} catch (err) {
+		logger.error(err, 'resolve failed')
+		return c.json({ error: 'Failed to resolve ids' }, 500)
 	}
 })
 

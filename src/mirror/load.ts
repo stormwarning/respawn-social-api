@@ -2,6 +2,7 @@ import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { sql } from '../db/client.js'
 import { markDirtyForEndpoint, notifyDirty } from '../derive/dirty.js'
+import { applyDeleteRedirects } from './redirect.js'
 import { logger } from '../logger.js'
 import {
 	checkSchema,
@@ -285,6 +286,18 @@ async function mergeStaging(endpoint: Endpoint, staging: string) {
 		)
 		insert into ${quote(changedTable)} (id) select id from removed on conflict do nothing`,
 	)
+
+	// Deleted games need a replacement worked out before the changed-id table
+	// goes away — it is the only record of which ids were tombstoned by this run.
+	if (endpoint === 'games' && deleted.count > 0) {
+		const tombstoned = await sql.unsafe<Array<{ id: string }>>(
+			`select c.id from ${quote(changedTable)} c
+			 join igdb_games g on g.id = c.id
+			 where g.deleted_at is not null`,
+		)
+		const redirected = await applyDeleteRedirects(tombstoned.map((r) => Number(r.id)))
+		if (redirected > 0) logger.info({ redirected }, 'Deleted games redirected to replacements')
+	}
 
 	const titlesDirtied = await queueAffectedTitles(endpoint, changedTable)
 	await sql.unsafe(`drop table if exists ${quote(changedTable)}`)

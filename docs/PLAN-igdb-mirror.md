@@ -1033,11 +1033,52 @@ races a derive worker running against the same database, which will happily
 build a title from your fixture. Test cleanup has to remove `titles` and
 `title_terms` too, not just the canonical side.
 
-### Phase 5 — identity
+### Phase 5 — identity ✅ done 2026-09-04
 
-- `resolveTitle`, `/games/resolve`, `/games/:id/members`.
-- Delete handling with heuristic redirect + tombstone `titles` row.
-- Web app §10 items 5–6.
+- `resolveTitles` (batched), `GET /games/resolve?ids=`, `/games/:id/members`.
+- Delete handling: heuristic redirect plus a tombstone `titles` row that keeps
+  serving. Verified with a synthetic duplicate merge — an accented-name twin
+  deleted, redirected to its survivor, and a record at the dead id landing on
+  the survivor's page.
+- Web app §10 items 5–6: `title-identity.ts` (resolve, group, merge,
+  consolidate-on-write) and `listLogs` filtering by every member id.
+
+**Three corrections to this section, all found by testing rather than reading:**
+
+1. **§7.1's resolution order is wrong.** It says members, then redirect. But a
+   deleted game keeps its `title_members` rows, so membership always wins and
+   the redirect branch is unreachable — for precisely the case redirects exist
+   to handle. The shipped order resolves membership first, and then yields to a
+   redirect when the title it found is `status = 'deleted'`. A live title always
+   wins; a tombstone gives way to a known replacement.
+2. **The §7.3 name match cannot use a SQL prefix filter.** The difference it
+   has to see through is the one a `lower(left(name, n))` comparison is blind
+   to: "Tést Merge Game" and "Test Merge Game" normalize to the same string and
+   share no lowercase prefix. Postgres has no NFKD without an extension, so the
+   match goes through `title_terms.term_norm`, which derive already populated
+   with the same `normalize()` search uses. One definition, one index
+   (migration `0010`).
+3. **The year rule is stricter than the plan implies.** If the deleted game has
+   a release year, the survivor must have the _same_ one, including having one
+   at all. A candidate with no date is not evidence of a match. A tombstone is
+   recoverable; a wrong redirect silently reattaches someone's rating to a
+   different game and nothing in the UI would reveal it.
+
+**Also fixed here:**
+
+- **`titles.slug` was unique across tombstones**, which would have broken the
+  first real delete: IGDB hands a deleted duplicate's slug to its survivor, and
+  deriving the survivor would have hit the unique index. Now partial on
+  `status = 'live'` (migration `0009`), and `/games/slug/:slug` prefers the live
+  title.
+- **`/games/:id` and `/games/resolve` disagreed.** The first read
+  `title_members` directly and served the tombstone; the second followed the
+  redirect. Both now go through the resolver.
+- **Open question 4 resolved** (see §14): `similar` already dropped entries
+  resolving back to the same title; it now also excludes deleted ones.
+
+**Deliberately not done:** §7.5 (the AppView member-id query) — the endpoint it
+needs exists now, but the change belongs in `services/appview`, not here.
 
 ### Phase 6 — cover colours
 
@@ -1217,25 +1258,66 @@ Verified by inspecting `games.csv` directly.
 
 ## 14. Open questions
 
-1. ~~**Dump CSV encoding details.**~~ **Resolved in Phase 0**, see §13.2.
-   Arrays are Postgres literals (`{1,2,3}`), nulls are unquoted empty fields,
-   timestamps are `YYYY-MM-DD HH:MM:SS`. Direct `COPY` works.
-2. **Dashes house style.** Spaced en dash (`Title – Subtitle`) or em dash
-   with no spaces (`Title—Subtitle`). Plan assumes spaced en dash.
-3. **Whether to typeset `summary`.** Cheap to do; decide whether the UI
-   wants it. Plan includes `summary_display`.
-4. **Similar games.** Currently one level of ids resolved to titles. Should
-   similar entries that resolve to the same title as the root be dropped
-   (yes, probably) and should deleted titles be filtered (yes).
-5. **Fly vs Railway** for the scheduled dump job. In-process cron is fine on
-   either as long as the machine doesn't auto-stop; if it does, use a
-   platform scheduled task that hits an authenticated `POST /admin/dumps`.
-6. ~~**`hypes` and `total_rating_count` availability.**~~ **Resolved in Phase
-   0**: both present, along with `rating_count` and `follows`. `hypes` is
-   empty for most released games, so `coalesce(…, 0)`.
+Resolved questions are kept, struck through, with where the answer landed —
+the reasoning is usually more useful than the conclusion.
 
-7. **Schema-version drift is already real.** The ten endpoints report five
-   different `schema_version` values, the oldest from 2023 and the newest
-   (`covers`, `1784008800`) from about three months ago. So §5.2 step 2 will
-   fire in practice; make sure it fails loudly per endpoint rather than
-   silently loading a shifted column set.
+### Open
+
+8. **`similar` needs quoting in every raw query.** `SIMILAR` is a reserved SQL
+   keyword (`SIMILAR TO`), so `select …, similar, …` is a syntax error rather
+   than a column reference. This has now bitten twice — once in the read layer,
+   once in a test fixture. Worth considering a rename to `similar_titles` in a
+   later migration; until then, quote it.
+9. **Nothing exercises a real IGDB delete yet.** The redirect heuristic and the
+   tombstone path are tested against synthetic rows only, because IGDB deleted
+   zero games in the days we have observed. The first real delete is worth
+   watching: check the `Deleted game redirected` / `several plausible
+replacements` log lines and confirm the choice by hand.
+10. **`applyDeleteRedirects` caps at 500 games per dump run.** Above that it
+    skips the heuristic entirely rather than quietly rewriting where thousands
+    of users' records point. If a legitimate bulk merge ever exceeds it, that is
+    a manual decision, not a config change.
+11. **Consolidation is not wired into the backlog actions.** §7.4 says backlog
+    items follow the same policy as game records, and `title-identity.ts` has
+    the pieces, but only the game-record actions call it. Backlog items are
+    keyed the same way, so the same fold produces the same duplicate.
+12. **Profile and feed pages do not group by title yet.** `groupByTitle` exists
+    and is unused outside the game page. A profile listing records saved before
+    a fold will show the same game twice until they do.
+13. **§7.5 (AppView) is untouched.** `GET /games/:id/members` exists now; the
+    HappyView backlog query still filters on a single raw `igdbId`, so
+    cross-user queries split after a fold. The change belongs in
+    `services/appview`.
+14. **Schema-version drift is already real.** The ten endpoints report five
+    different `schema_version` values, the oldest from 2023 and the newest
+    (`covers`) from about three months ago. §5.2's guard fires per endpoint and
+    aborts that endpoint alone — verified in Phase 1 — but nobody is alerted
+    when it does. Worth surfacing on `/health` alongside the other freshness
+    signals.
+15. **`titles` carries ~370 MB of avoidable jsonb** (§13.3). Measured in Phase 3
+    as buying no read latency: `/games/:id` is 2 ms at p50. Deferred, not
+    rejected.
+16. **Fly vs Railway** for the scheduled dump job. In-process cron is fine on
+    either as long as the machine does not auto-stop; if it does, use a platform
+    scheduled task hitting an authenticated `POST /admin/dumps`. Nothing is
+    deployed yet, so this is still open.
+
+### Resolved
+
+1. ~~**Dump CSV encoding details.**~~ **Phase 0**, see §13.2. Arrays are
+   Postgres literals (`{1,2,3}`), nulls are unquoted empty fields, timestamps
+   are `YYYY-MM-DD HH:MM:SS`. Direct `COPY` works.
+2. ~~**Dashes house style.**~~ **Decided 2026-09-03**: spaced en dash
+   (`Title – Subtitle`). Digit ranges get an unspaced en dash.
+3. ~~**Whether to typeset `summary`.**~~ **Decided 2026-09-03**: yes,
+   `summary_display` ships. Note §13.3 — it is 139 MB and a pure function of
+   `summary`, so typesetting on read is a live option if the size matters more
+   than the CPU.
+4. ~~**Similar games.**~~ **Resolved in Phase 5.** Entries resolving back to the
+   same title as the root were already dropped; deleted titles are now excluded
+   too.
+5. ~~**`hypes` and `total_rating_count` availability.**~~ **Phase 0**: both
+   present, with `rating_count` and `follows`. `hypes` is empty for most
+   released games, so `coalesce(…, 0)`.
+6. ~~**Does the schema-drift guard fire in practice?**~~ **Yes** — see open
+   question 14 for what is still missing.

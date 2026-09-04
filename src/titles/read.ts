@@ -12,6 +12,7 @@ import { igdbRequest } from '../igdb/client.js'
 import { logger } from '../logger.js'
 import { upsertEntity } from '../mirror/upsert.js'
 import { normalize } from '../search/normalize.js'
+import { resolveTitle } from './resolve.js'
 
 /**
  * Reading titles — the entire API read path.
@@ -176,26 +177,33 @@ async function loadTitle(titleId: number): Promise<Title | null> {
  * lets the web app canonicalise its URL.
  */
 export async function getTitleByGameId(gameId: number): Promise<Title | null> {
-	const [member] = await sql<Array<{ title_id: string }>>`
-		select title_id from title_members where game_id = ${gameId}
-	`
+	// One definition of "where does this id point now", shared with
+	// /games/resolve. Resolving here rather than reading `title_members`
+	// directly is what makes a deleted duplicate's id land on its survivor —
+	// membership alone would serve the tombstone, and the two endpoints would
+	// disagree about the same id.
+	const resolved = await resolveTitle(gameId)
 
-	if (!member) {
+	if (resolved.titleId === null) {
+		if (resolved.via !== 'unknown') return null
 		const derived = await fetchUnknownGame(gameId)
 		if (derived === null) return null
-		const title = await loadTitle(derived)
-		if (!title) return null
-		return derived === gameId ? title : { ...title, resolvedFrom: gameId }
+		const fetched = await loadTitle(derived)
+		if (!fetched) return null
+		return derived === gameId ? fetched : { ...fetched, resolvedFrom: gameId }
 	}
 
-	const titleId = Number(member.title_id)
-	const title = await loadTitle(titleId)
+	const title = await loadTitle(resolved.titleId)
 	if (!title) return null
-	return titleId === gameId ? title : { ...title, resolvedFrom: gameId }
+	return resolved.titleId === gameId ? title : { ...title, resolvedFrom: gameId }
 }
 
 export async function getTitleBySlug(slug: string): Promise<Title | null> {
-	const [row] = await sql<TitleRow[]>`${TITLE_SELECT} where slug = ${slug}`
+	const [row] = await sql<TitleRow[]>`
+		${TITLE_SELECT} where slug = ${slug}
+		order by (status = 'live') desc, id
+		limit 1
+	`
 	if (!row) return null
 	return toTitle(row, await membersOf(Number(row.id)))
 }

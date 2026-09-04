@@ -199,7 +199,9 @@ export async function loadInputs(
 
 	// Similar games are stored as raw IGDB ids, which may point at a game that
 	// folds into some other title. Resolve them through the same membership map
-	// so a "similar" link never lands on a page that does not exist.
+	// so a "similar" link never lands on a page that does not exist. Entries
+	// that resolve back to this title are dropped (a game is not similar to
+	// itself), and so are ones IGDB has deleted.
 	const similarRootIds = new Set<number>()
 	for (const rootId of rootIds) {
 		for (const id of nums(gameById.get(rootId)?.similar_games ?? null)) {
@@ -211,7 +213,7 @@ export async function loadInputs(
 		similarRootIds.size === 0
 			? []
 			: await sql<GameRow[]>`
-		${GAME_SELECT} where g.id = any(${[...similarRootIds]})
+		${GAME_SELECT} where g.id = any(${[...similarRootIds]}) and g.deleted_at is null
 	`
 	const similarById = new Map<number, GameRow>()
 	for (const row of similarRows) similarById.set(Number(row.id), row)

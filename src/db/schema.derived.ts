@@ -175,7 +175,14 @@ export const titles = pgTable(
 		derivedAt: timestamp('derived_at', { withTimezone: true }).notNull().defaultNow(),
 	},
 	(t) => [
-		uniqueIndex('titles_slug_idx').on(t.slug),
+		// Partial on purpose. A tombstoned title keeps its slug so its page still
+		// renders, and IGDB reassigns the slug of a deleted duplicate to the survivor
+		// — a unique index over ALL titles would then reject the live one at derive
+		// time. Uniqueness only has to hold among titles anyone can reach.
+		uniqueIndex('titles_slug_live_idx')
+			.on(t.slug)
+			.where(sql`${t.status} = 'live'`),
+		index('titles_slug_idx').on(t.slug),
 		index('titles_status_idx').on(t.status),
 		index('titles_popularity_idx').on(t.popularity),
 		check('titles_status', sql`${t.status} in ('live','deleted')`),
