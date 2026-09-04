@@ -1086,8 +1086,9 @@ needs exists now, but the change belongs in `services/appview`, not here.
   `GET /covers/:imageId/colors`. `/health` reports how many are still pending.
 - Web `buildCover` reads the colour from the API; **`sharp` removed from
   `apps/web`** entirely.
-- `sharp` under Deno 2 works. Whether it works in the Docker image — the plan's
-  open worry — is **not yet verified**; see open question 19. See §13.4.
+- `sharp` under Deno 2 works, and works in the Docker image on both
+  `linux/arm64` and `linux/amd64` — the plan's open worry, now closed. See
+  §13.4.
 
 **Measured:** ~35 covers/sec at concurrency 6. 267,041 distinct covers across
 309,568 live titles, so a full backfill is roughly two hours. It is deliberately
@@ -1154,12 +1155,12 @@ script needs approving once (`deno approve-scripts sharp`). The tasks that touch
 it need `--allow-ffi`, which is now on `dev`, `start`, `test` and
 `colors:backfill`.
 
-The `denoland/deno` image is **untested** — the build was still running when
-this was written. `sharp` ships prebuilt `linux-x64` binaries with bundled
-libvips, so in principle no apt packages are needed, but `deno install` inside
-the image also has to run sharp's install script, and Deno gates those behind
-`deno approve-scripts` on the host. That approval is recorded in `deno.lock`,
-so it should carry — but it needs confirming before a deploy.
+It also works in the `denoland/deno` image, verified on `linux/arm64` and
+`linux/amd64`: `deno install` runs sharp's install script inside the container
+(the build log shows `Initialize sharp@0.34.4`), the approval recorded in
+`deno.lock` carries over, and decoding a real cover in the image returns exactly
+the host's answer. npm's optional dependencies pull the right prebuilt binary
+per platform, so the Dockerfile needs no apt packages and no changes.
 
 ### 13.3 Phase 2, measured 2026-09-03
 
@@ -1365,20 +1366,6 @@ replacements` log lines and confirm the choice by hand.
     run, the endpoint computes each on first request, which is correct but slow
     for whoever gets there first.
 
-19. **`sharp` in the Docker image is unverified.** It works natively under Deno
-    2 on macOS. The first image build died with `DeadlineExceeded` pulling
-    `denoland/deno:latest` — an environment problem that says nothing about
-    sharp either way — so nothing yet confirms that `deno install` inside the
-    image runs sharp's native install script. Deno gates build scripts behind
-    `deno approve-scripts`, and whether that approval carries into a clean
-    container is exactly the thing to check. **Confirm before deploying.** If it
-    fails, either add a `RUN deno approve-scripts sharp` step or depend on
-    `@img/sharp-linux-x64` explicitly so no build script is needed.
-
-    Note for whoever checks: `docker build … | tail` reports _tail's_ exit
-    status, so a failed build reads as a success. Read the output, not `$?` —
-    that is how this was nearly recorded as passing.
-
 ### Resolved
 
 1. ~~**Dump CSV encoding details.**~~ **Phase 0**, see §13.2. Arrays are
@@ -1398,3 +1385,16 @@ replacements` log lines and confirm the choice by hand.
    released games, so `coalesce(…, 0)`.
 6. ~~**Does the schema-drift guard fire in practice?**~~ **Yes** — see open
    question 14 for what is still missing.
+7. ~~**`sharp` in the Docker image.**~~ **Verified 2026-09-04 on both
+   architectures.** `deno install` inside `denoland/deno` runs sharp's native
+   install script (the build log shows `Initialize sharp@0.34.4`), and the
+   approval recorded in `deno.lock` carries into a clean container. Decoding a
+   real cover inside the image returns exactly the host's answer —
+   `{r:232,g:248,b:248}` — on `linux/arm64` and `linux/amd64` alike. npm's
+   optional dependencies pull `@img/sharp-linux-x64` or `-arm64` as
+   appropriate, so the Dockerfile needs no apt packages and no changes.
+
+   Two things that cost time here. The first build failed with
+   `DeadlineExceeded` pulling the base image — `docker pull denoland/deno:latest`
+   separately first, then build. And `docker build … | tail` reports _tail's_
+   exit status, so a failed build reads as exit 0; read the output, not `$?`.
