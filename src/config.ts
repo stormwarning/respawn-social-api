@@ -36,6 +36,42 @@ const EnvSchema = z.object({
 	// created since our last dump — but the cap stays as a guard.
 	IGDB_RATE_CAP: z.coerce.number().int().min(1).max(4).default(3),
 
+	// ---- Freshness (Phase 4) ----
+	// Shared secret IGDB echoes back in the X-Secret header on every webhook.
+	// Required only when webhooks are enabled; without it we cannot tell a real
+	// delivery from anyone who guessed the URL.
+	IGDB_WEBHOOK_SECRET: z.string().min(16).optional(),
+
+	// The externally reachable origin IGDB should POST to, e.g.
+	// https://api.respawn.social. IGDB cannot reach localhost, which is why
+	// webhooks stay off in development.
+	PUBLIC_URL: z.string().url().optional(),
+
+	// Off by default. Registering a localhost URL would create a webhook IGDB
+	// can never deliver to, and five failed deliveries deactivate it.
+	IGDB_WEBHOOKS_ENABLED: z
+		.string()
+		.default('false')
+		.transform((v) => v === 'true'),
+
+	// Run the nightly dump load in-process. Off by default so a dev machine does
+	// not pull 700MB overnight.
+	DUMP_SCHEDULE_ENABLED: z
+		.string()
+		.default('false')
+		.transform((v) => v === 'true'),
+
+	// UTC hour to load dumps at. IGDB regenerates them daily; 06:00 UTC is after
+	// that and before European morning traffic.
+	DUMP_LOAD_HOUR: z.coerce.number().int().min(0).max(23).default(6),
+
+	// The derive worker drains dirty_titles. Safe to leave on everywhere: with
+	// nothing dirty it sleeps on LISTEN.
+	DERIVE_WORKER_ENABLED: z
+		.string()
+		.default('true')
+		.transform((v) => v === 'true'),
+
 	NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 })
 

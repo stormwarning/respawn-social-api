@@ -52,6 +52,7 @@ async function sequentially(endpoints: Endpoint[]) {
 				rowsLoaded: 0,
 				rowsChanged: 0,
 				rowsDeleted: 0,
+				titlesDirtied: 0,
 				elapsedMs: 0,
 			})
 		}
@@ -61,13 +62,16 @@ async function sequentially(endpoints: Endpoint[]) {
 
 const pad = (s: string | number, n: number) => String(s).padStart(n)
 console.log('')
-console.log('endpoint             status        loaded   changed   deleted     time')
+console.log('endpoint             status        loaded   changed   deleted     dirty     time')
 for (const r of results) {
 	console.log(
 		`${r.endpoint.padEnd(20)} ${r.status.padEnd(9)} ${pad(r.rowsLoaded.toLocaleString(), 9)} ${pad(
 			r.rowsChanged.toLocaleString(),
 			9,
-		)} ${pad(r.rowsDeleted.toLocaleString(), 9)} ${pad(`${(r.elapsedMs / 1000).toFixed(1)}s`, 8)}`,
+		)} ${pad(r.rowsDeleted.toLocaleString(), 9)} ${pad(r.titlesDirtied.toLocaleString(), 9)} ${pad(
+			`${(r.elapsedMs / 1000).toFixed(1)}s`,
+			8,
+		)}`,
 	)
 	if (r.reason) console.log(`  └─ ${r.reason}`)
 }

@@ -979,16 +979,59 @@ endpoint is Phase 6 work. Nothing in Phase 3 can land it, so `sharp` stays in
 6. The response uses **camelCase** throughout, not the snake_case of §9's
    sketch, matching the web app's existing conventions.
 
-### Phase 4 — freshness
+### Phase 4 — freshness ✅ done 2026-09-04 (built and verified locally)
 
-- Webhook route with secret + UA verification, tests for each operation and
-  for rejection.
-- `ensureWebhooks()` on boot; `/health` reports `webhooksActive`.
-- Derive worker drains `dirty_titles` via `LISTEN`; a manual `UPDATE` to a
-  canonical row followed by a dirty insert is visible on `/games/:id` within
-  seconds.
-- Nightly dump scheduled; a dump run with changes results in only the
-  affected titles being re-derived (check `derived_at`).
+- `POST /webhooks/igdb` with secret + user-agent verification. 12 tests cover
+  every rejection and every operation.
+- `ensureWebhooks()` on boot; `/health` reports the worker, the scheduler and
+  the webhook registration together.
+- Derive worker drains `dirty_titles` on `LISTEN`, with a 60 s poll as a safety
+  net. **A manual canonical `UPDATE` plus a dirty insert was visible on
+  `/games/:id` in 0.04 s.** A webhook end to end — receive, mirror, queue,
+  derive, serve — took ~0.5 s, including one arriving on a child endpoint
+  (`covers`) and propagating to its parent title.
+- Nightly dump scheduled (off by default; `DUMP_SCHEDULE_ENABLED`). A load with
+  changes queues only the affected titles: a `games` reload that found 1 changed
+  row queued exactly 1 title.
+
+**Nothing is registered with IGDB.** `IGDB_WEBHOOKS_ENABLED` defaults to false
+and stays false until there is a public URL — IGDB cannot deliver to localhost,
+and five failed deliveries deactivate a webhook. The route was exercised
+locally with a dev secret.
+
+**Deviations and finds:**
+
+1. **The worker picks its strategy by backlog size.** `deriveOne` per title
+   walks just that subtree; a `sweep` loads the whole 374k-game parent graph
+   once and resolves every root in a pass. Under 500 pending titles the first is
+   cheaper; over it the second is, by a wide margin — running `deriveOne` 46,000
+   times after a nightly dump would take hours. Both paths now share
+   `src/derive/sweep.ts` with `derive:all`.
+2. **Dirty propagation is entirely set-based.** §6.5 describes it per-id, which
+   would be 46k round trips a night. `markDirtyForEndpoint` maps changed ids to
+   titles in one statement, driven off a table the loader fills rather than ids
+   shipped through the client.
+3. **`platforms`/`genres` mark every title dirty** rather than §6.5's
+   `reference_version` scheme. 220 and 23 rows that change maybe twice a year,
+   against a sweep that takes a minute — the bookkeeping cost more than the
+   work it avoided. `companies` joins through `involved_companies` and stays
+   precise.
+4. **The dump loader NOTIFYs.** `deno task db:dumps` run by hand queues work for
+   a server running in a different process, which would otherwise sit until the
+   60 s poll.
+5. **The first dump load skips queueing entirely.** With `titles` empty every
+   changed game looks like a new title, so the first load would queue all 374k.
+   The initial build is `derive:all`, which needs no queue.
+6. **Reasons are inlined into SQL, and validated first.** These statements build
+   their FROM clause from a table name so they use `unsafe`, whose bound
+   parameters postgres.js types as `never` for an untyped client. The one
+   dynamic value is inlined behind a character-set check, with a test that a
+   reason carrying SQL is refused.
+
+**Note for whoever writes tests next:** anything that writes canonical rows
+races a derive worker running against the same database, which will happily
+build a title from your fixture. Test cleanup has to remove `titles` and
+`title_terms` too, not just the canonical side.
 
 ### Phase 5 — identity
 

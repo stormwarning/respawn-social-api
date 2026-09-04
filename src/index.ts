@@ -3,9 +3,18 @@ import { cors } from 'hono/cors'
 import { config } from './config.js'
 import { logger } from './logger.js'
 import { gamesRoutes } from './routes/games.js'
+import { webhooksRoutes } from './routes/webhooks.js'
+import { startDeriveWorker, stopDeriveWorker, workerStatus } from './derive/worker.js'
+import { schedulerStatus, startDumpScheduler, stopDumpScheduler } from './mirror/scheduler.js'
+import { ensureWebhooks } from './mirror/webhooks.js'
 import { mirrorHealth } from './titles/read.js'
 
 const app = new Hono()
+
+/** Filled in once `ensureWebhooks()` has run; surfaced on /health. */
+let webhookHealth: Awaited<ReturnType<typeof ensureWebhooks>> | { skipped: string } = {
+	skipped: 'not yet run',
+}
 
 /**
  * CORS (Cross-Origin Resource Sharing).
@@ -33,10 +42,18 @@ app.use(
  * and dependency-free.
  */
 app.get('/health', async (c) => {
-	// The mirror counts make a stalled dump loader visible from outside: if
-	// `lastDumpAt` stops moving, freshness has silently stopped.
+	// Freshness fails quietly by nature: a deactivated webhook or a stalled dump
+	// loader breaks nothing visible, the data just stops moving. Everything that
+	// would go silently wrong is reported here so it can be alerted on.
 	try {
-		return c.json({ status: 'ok', uptime: process.uptime(), mirror: await mirrorHealth() })
+		return c.json({
+			status: 'ok',
+			uptime: process.uptime(),
+			mirror: await mirrorHealth(),
+			worker: workerStatus(),
+			dumps: schedulerStatus(),
+			webhooks: webhookHealth,
+		})
 	} catch (err) {
 		logger.error(err, 'health check could not read the mirror')
 		return c.json({ status: 'degraded', uptime: process.uptime() }, 503)
@@ -44,7 +61,8 @@ app.get('/health', async (c) => {
 })
 
 // Feature routes.
-app.route('/games', gamesRoutes) // IGDB-backed game data (cached)
+app.route('/games', gamesRoutes) // Derived titles, served from Postgres
+app.route('/webhooks', webhooksRoutes) // IGDB change notifications
 
 /**
  * Fallback handlers.
@@ -68,6 +86,42 @@ app.onError((err, c) => {
  * needed). It calls `app.fetch` for every incoming request — Hono speaks the web
  * -standard Request/Response interface that Deno provides.
  */
-Deno.serve({ port: config.PORT }, app.fetch)
+const server = Deno.serve({ port: config.PORT }, app.fetch)
 
 logger.info(`Listening on http://localhost:${config.PORT}`)
+
+/**
+ * Background freshness (Phase 4).
+ *
+ * Started below, after the server is listening, and never awaited: a slow IGDB
+ * or a backlog of dirty titles must not delay the port opening, or a deploy
+ * health check fails and the platform kills a process that was working fine.
+ */
+if (config.DERIVE_WORKER_ENABLED) {
+	startDeriveWorker().catch((err) => logger.error(err, 'Derive worker failed to start'))
+}
+
+startDumpScheduler()
+
+ensureWebhooks()
+	.then((result) => {
+		webhookHealth = result
+	})
+	.catch((err) => logger.error(err, 'Webhook registration failed'))
+
+/**
+ * Shut down cleanly.
+ *
+ * The worker holds a LISTEN connection and may be mid-derive; dropping it
+ * without notice leaves rows dirty (harmless, the next boot drains them) but
+ * also leaks the connection until Postgres times it out.
+ */
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+	Deno.addSignalListener(signal, () => {
+		logger.info({ signal }, 'Shutting down')
+		stopDumpScheduler()
+		void stopDeriveWorker().finally(() => {
+			void server.shutdown().finally(() => Deno.exit(0))
+		})
+	})
+}

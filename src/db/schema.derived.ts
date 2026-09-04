@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 import {
 	bigint,
+	bigserial,
 	char,
 	check,
 	doublePrecision,
@@ -11,7 +12,9 @@ import {
 	primaryKey,
 	text,
 	timestamp,
+	unique,
 	uniqueIndex,
+	uuid,
 } from 'drizzle-orm/pg-core'
 
 /**
@@ -234,3 +237,27 @@ export const dirtyTitles = pgTable('dirty_titles', {
 	reason: text('reason'),
 	queuedAt: timestamp('queued_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/**
+ * An audit log of webhook deliveries.
+ *
+ * Its real job is idempotency. IGDB gives no delivery guarantee and will resend,
+ * so the unique constraint lets a repeat be recognised and dropped rather than
+ * re-derived. It is also the only record of what IGDB told us and when, which
+ * is the first thing worth looking at when a title is wrong.
+ */
+export const igdbEvents = pgTable(
+	'igdb_events',
+	{
+		id: bigserial('id', { mode: 'number' }).primaryKey(),
+		endpoint: text('endpoint').notNull(),
+		op: text('op').notNull(),
+		entityId: bigint('entity_id', { mode: 'number' }).notNull(),
+		checksum: uuid('checksum'),
+		receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+	},
+	(t) => [
+		unique('igdb_events_delivery').on(t.endpoint, t.entityId, t.checksum, t.op),
+		index('igdb_events_received_at_idx').on(t.receivedAt),
+	],
+)

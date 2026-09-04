@@ -1,6 +1,7 @@
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { sql } from '../db/client.js'
+import { markDirtyForEndpoint, notifyDirty } from '../derive/dirty.js'
 import { logger } from '../logger.js'
 import {
 	checkSchema,
@@ -40,6 +41,8 @@ export interface LoadResult {
 	rowsLoaded: number
 	rowsChanged: number
 	rowsDeleted: number
+	/** Titles queued for re-derive as a result of this load. */
+	titlesDirtied: number
 	elapsedMs: number
 }
 
@@ -81,6 +84,7 @@ export async function loadAll(options: LoadOptions = {}): Promise<LoadResult[]> 
 				rowsLoaded: 0,
 				rowsChanged: 0,
 				rowsDeleted: 0,
+				titlesDirtied: 0,
 				elapsedMs: 0,
 			})
 		}
@@ -94,7 +98,7 @@ export async function loadEndpoint(
 	latestUpdatedAt?: number,
 ): Promise<LoadResult> {
 	const started = Date.now()
-	const nothing = { rowsLoaded: 0, rowsChanged: 0, rowsDeleted: 0 }
+	const nothing = { rowsLoaded: 0, rowsChanged: 0, rowsDeleted: 0, titlesDirtied: 0 }
 	const done = (rest: Omit<LoadResult, 'endpoint' | 'elapsedMs'>): LoadResult => ({
 		endpoint,
 		elapsedMs: Date.now() - started,
@@ -249,35 +253,70 @@ async function mergeStaging(endpoint: Endpoint, staging: string) {
 		`select count(*)::int as "rowsLoaded" from ${quote(staging)}`,
 	)
 
+	// Which ids moved, kept in a table rather than shipped to the client: a
+	// nightly `games` load changes ~46k rows, and mapping those to titles is a
+	// set operation that belongs in the database.
+	const changedTable = `${staging}_changed`
+	await sql.unsafe(`drop table if exists ${quote(changedTable)}`)
+	await sql.unsafe(`create unlogged table ${quote(changedTable)} (id bigint primary key)`)
+
 	const changed = await sql.unsafe(
-		`insert into ${quote(live)} (${cols}, mirror_updated_at, deleted_at)
-		 select ${names.map((n) => `s.${quote(n)}`).join(', ')}, now(), null
-		 from ${quote(staging)} s
-		 left join ${quote(live)} l on l.id = s.id
-		 where l.id is null
-		    or l.checksum is distinct from s.checksum
-		    or l.deleted_at is not null
-		 on conflict (id) do update set ${updates}, mirror_updated_at = now(), deleted_at = null`,
+		`with upserted as (
+			insert into ${quote(live)} (${cols}, mirror_updated_at, deleted_at)
+			select ${names.map((n) => `s.${quote(n)}`).join(', ')}, now(), null
+			from ${quote(staging)} s
+			left join ${quote(live)} l on l.id = s.id
+			where l.id is null
+			   or l.checksum is distinct from s.checksum
+			   or l.deleted_at is not null
+			on conflict (id) do update set ${updates}, mirror_updated_at = now(), deleted_at = null
+			returning id
+		)
+		insert into ${quote(changedTable)} (id) select id from upserted on conflict do nothing`,
 	)
 
 	// Absent from the dump = deleted upstream. Tombstone, never remove: see §7.3.
 	const deleted = await sql.unsafe(
-		`update ${quote(live)} l set deleted_at = now()
-		 where l.deleted_at is null
-		   and not exists (select 1 from ${quote(staging)} s where s.id = l.id)`,
+		`with removed as (
+			update ${quote(live)} l set deleted_at = now()
+			where l.deleted_at is null
+			  and not exists (select 1 from ${quote(staging)} s where s.id = l.id)
+			returning id
+		)
+		insert into ${quote(changedTable)} (id) select id from removed on conflict do nothing`,
 	)
 
-	return { rowsLoaded, rowsChanged: changed.count, rowsDeleted: deleted.count }
+	const titlesDirtied = await queueAffectedTitles(endpoint, changedTable)
+	await sql.unsafe(`drop table if exists ${quote(changedTable)}`)
+
+	// Wake any derive worker, including one in a DIFFERENT process. `deno task
+	// db:dumps` run by hand queues work that a running server has to pick up,
+	// and without this it waits for the 60-second poll instead of starting now.
+	if (titlesDirtied > 0) await notifyDirty()
+
+	return {
+		rowsLoaded,
+		rowsChanged: changed.count,
+		rowsDeleted: deleted.count,
+		titlesDirtied,
+	}
 }
 
 /**
- * The `updated_at` we recorded for this endpoint's last successful load.
+ * Queue the titles a set of changed rows affects.
  *
- * Note the `Number()`. `dump_runs.updated_at` is int8, and postgres.js hands
- * int8 back as a STRING rather than assume it fits in a JS number — so
- * comparing it straight against IGDB's numeric `updated_at` is always false,
- * and every endpoint reloads every night. See src/mirror/copy.test.ts.
+ * Skipped entirely before the first derive: with `titles` empty, every changed
+ * game looks like a brand-new title and the first dump load would queue all
+ * 374k of them. The initial build is `deno task derive:all`, and it does not
+ * need a queue to tell it what to do.
  */
+async function queueAffectedTitles(endpoint: Endpoint, changedTable: string): Promise<number> {
+	const [row] = await sql<Array<{ n: number }>>`select count(*)::int as n from titles limit 1`
+	if ((row?.n ?? 0) === 0) return 0
+
+	return markDirtyForEndpoint(sql, endpoint, quote(changedTable), `dump:${endpoint}`)
+}
+
 async function lastRun(endpoint: Endpoint): Promise<number | null> {
 	const rows = await sql<{ updated_at: string | null }[]>`
 		select updated_at from dump_runs where endpoint = ${endpoint}

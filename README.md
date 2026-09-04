@@ -53,12 +53,19 @@ src/
     graph.ts          The parent graph in memory; membership for every game
     load.ts           Batch loading, so derive stays pure
     write.ts          Bulk upsert of titles / members / terms
+    sweep.ts          Derive many titles at once (derive:all and the worker)
+    one.ts            Derive a single title without loading the whole graph
+    dirty.ts          Which titles a changed row affects
+    worker.ts         Drains dirty_titles on LISTEN, with a poll as backstop
 
   search/
     normalize.ts      The one function both the search index and the user's
                       query go through. If they diverge, search breaks silently.
 
   mirror/             === The local IGDB mirror ===
+    scheduler.ts      The nightly dump load.
+    webhooks.ts       Registering with IGDB, and re-registering on boot.
+    upsert.ts         One canonical row from JSON (webhooks + the fallback).
     endpoints.ts      What we mirror, and its types. Source of truth for the
                       generated schema, the staging DDL, and the drift guard.
     dumps.ts          The Data Partner dump API + the schema drift check.
@@ -226,6 +233,34 @@ Quick check:
 curl localhost:8000/health
 curl "localhost:8000/games/search?q=hollow%20knight"
 ```
+
+---
+
+## Staying fresh
+
+Two mechanisms, and the second is what makes the first safe to rely on.
+
+**Webhooks** give freshness in seconds. IGDB posts one changed entity; we mirror
+it, work out which titles it affects, and wake the derive worker. Measured end
+to end at about half a second.
+
+**The nightly dump** is the reconciler. A missed delivery, a webhook IGDB
+deactivated after five failures, an hour of downtime — all of it self-heals,
+because the dump is the whole truth and the loader diffs against it. Freshness
+degrades to 24 hours, never to silently wrong.
+
+Both feed one queue (`dirty_titles`) drained by one worker. It listens for
+`NOTIFY` so a webhook lands immediately, and polls every 60 seconds because a
+title stuck dirty forever is a silent staleness bug.
+
+`/health` reports all of it — last dump, pending titles, worker state, webhook
+registration — because every failure here is invisible from the outside. If
+`lastDumpAt` stops moving, freshness has stopped and nothing else will say so.
+
+Webhooks are **off** unless `IGDB_WEBHOOKS_ENABLED=true`, and need `PUBLIC_URL`
+and `IGDB_WEBHOOK_SECRET`. IGDB cannot deliver to localhost, and five failed
+deliveries deactivate a webhook, so registering from a dev machine is worse than
+not registering at all.
 
 ---
 
