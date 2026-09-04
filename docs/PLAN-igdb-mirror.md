@@ -1366,13 +1366,18 @@ replacements` log lines and confirm the choice by hand.
     for whoever gets there first.
 
 19. **`sharp` in the Docker image is unverified.** It works natively under Deno
-    2 on macOS. The image build was still running when Phase 6 landed, so
-    nothing confirms that `deno install` inside `denoland/deno` runs sharp's
-    native install script — Deno gates build scripts behind `deno
-approve-scripts`, and whether the lockfile approval carries into a clean
-    container is exactly the thing to check. **Confirm before deploying**, and
-    if it fails, either pin `@img/sharp-linux-x64` explicitly or add a
-    `RUN deno approve-scripts sharp` step.
+    2 on macOS. The first image build died with `DeadlineExceeded` pulling
+    `denoland/deno:latest` — an environment problem that says nothing about
+    sharp either way — so nothing yet confirms that `deno install` inside the
+    image runs sharp's native install script. Deno gates build scripts behind
+    `deno approve-scripts`, and whether that approval carries into a clean
+    container is exactly the thing to check. **Confirm before deploying.** If it
+    fails, either add a `RUN deno approve-scripts sharp` step or depend on
+    `@img/sharp-linux-x64` explicitly so no build script is needed.
+
+    Note for whoever checks: `docker build … | tail` reports _tail's_ exit
+    status, so a failed build reads as a success. Read the output, not `$?` —
+    that is how this was nearly recorded as passing.
 
 ### Resolved
 
