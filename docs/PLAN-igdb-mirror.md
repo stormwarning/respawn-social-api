@@ -1080,10 +1080,41 @@ build a title from your fixture. Test cleanup has to remove `titles` and
 **Deliberately not done:** §7.5 (the AppView member-id query) — the endpoint it
 needs exists now, but the change belongs in `services/appview`, not here.
 
-### Phase 6 — cover colours
+### Phase 6 — cover colours ✅ done 2026-09-04
 
-- `cover_colors`, worker hook, `/covers/:imageId/colors`.
-- Web `buildCover` reads from the API; `sharp` removed from `apps/web`.
+- `cover_colors` populated by `deno task colors:backfill`, plus lazy compute on
+  `GET /covers/:imageId/colors`. `/health` reports how many are still pending.
+- Web `buildCover` reads the colour from the API; **`sharp` removed from
+  `apps/web`** entirely.
+- `sharp` under Deno 2 works. Whether it works in the Docker image — the plan's
+  open worry — is **not yet verified**; see open question 19. See §13.4.
+
+**Measured:** ~35 covers/sec at concurrency 6. 267,041 distinct covers across
+309,568 live titles, so a full backfill is roughly two hours. It is deliberately
+a separate opt-in command, not something a derive run triggers.
+
+**Deviations from §6.8:**
+
+1. **No worker hook.** §6.8 has the derive worker check `cover_colors` after
+   each derive, which would make a full sweep attempt 267k image fetches inline.
+   Instead the pending set is a QUERY — live titles left-joined to
+   `cover_colors` — drained by an opt-in command and topped up lazily by the
+   endpoint. Nothing to keep in sync, nothing lost if a run dies halfway, and a
+   cover that arrives after the last backfill still answers on first request.
+2. **The palette is real.** §6.8 has it as an optional extra; the first
+   implementation resized to 3x3 and counted pixels, which gave nine "colours"
+   each with population 1 — technically a palette, useless as one. It now
+   downsamples to 8x8 and buckets near-identical pixels so populations mean
+   something.
+3. **Colour lookup is best-effort on the write path.** A cover with no colour
+   still uploads. Failing a user's action because a tint is unavailable is the
+   wrong trade.
+
+**Worth knowing:** `dominant` comes from `sharp`'s histogram and skews light —
+The Witcher 3's cover gives `#e8f8f8`, nearly white, while the palette's top
+swatch is `#615e5f`. That is unchanged from what the web app computed before, so
+nothing regressed, but the palette is probably the better tint source. See open
+question 17.
 
 ---
 
@@ -1108,6 +1139,27 @@ Measured 2026-09-02 from the dump dated `1788328800`. Files are in
 Total ≈ 694 MB of CSV. Titles after Phase 2: **309,568** (predicted 316,372 as
 an upper bound, see below — the 6,804 difference is version children that fold
 instead). `derive:all` wall time: **67 s**.
+
+### 13.4 Phase 6, measured 2026-09-04
+
+|                                 |                                       |
+| ------------------------------- | ------------------------------------- |
+| Distinct covers on live titles  | 267,441                               |
+| Extraction rate (concurrency 6) | ~35/sec                               |
+| Full backfill, estimated        | ~2 hours                              |
+| `cover_colors` row              | image id, `#rrggbb`, 3-swatch palette |
+
+`sharp` runs under Deno 2 with `nodeModulesDir: auto`, and its native install
+script needs approving once (`deno approve-scripts sharp`). The tasks that touch
+it need `--allow-ffi`, which is now on `dev`, `start`, `test` and
+`colors:backfill`.
+
+The `denoland/deno` image is **untested** — the build was still running when
+this was written. `sharp` ships prebuilt `linux-x64` binaries with bundled
+libvips, so in principle no apt packages are needed, but `deno install` inside
+the image also has to run sharp's install script, and Deno gates those behind
+`deno approve-scripts` on the host. That approval is recorded in `deno.lock`,
+so it should carry — but it needs confirming before a deploy.
 
 ### 13.3 Phase 2, measured 2026-09-03
 
@@ -1301,6 +1353,26 @@ replacements` log lines and confirm the choice by hand.
     either as long as the machine does not auto-stop; if it does, use a platform
     scheduled task hitting an authenticated `POST /admin/dumps`. Nothing is
     deployed yet, so this is still open.
+
+17. **`dominant` skews light.** It is `sharp`'s histogram dominant, which
+    favours large flat areas — usually a cover's pale background. The Witcher 3
+    resolves to `#e8f8f8` while the palette's top swatch is `#615e5f`. The web
+    app has always used this value so nothing regressed, but if a tint ever
+    looks washed out, the palette is the better source and the API already
+    returns it.
+18. **267k covers have no colours yet.** Only 400 were backfilled locally as a
+    smoke test. `deno task colors:backfill` takes about two hours; until it has
+    run, the endpoint computes each on first request, which is correct but slow
+    for whoever gets there first.
+
+19. **`sharp` in the Docker image is unverified.** It works natively under Deno
+    2 on macOS. The image build was still running when Phase 6 landed, so
+    nothing confirms that `deno install` inside `denoland/deno` runs sharp's
+    native install script — Deno gates build scripts behind `deno
+approve-scripts`, and whether the lockfile approval carries into a clean
+    container is exactly the thing to check. **Confirm before deploying**, and
+    if it fails, either pin `@img/sharp-linux-x64` explicitly or add a
+    `RUN deno approve-scripts sharp` step.
 
 ### Resolved
 

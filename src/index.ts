@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { config } from './config.js'
 import { logger } from './logger.js'
+import { coversRoutes } from './routes/covers.js'
 import { gamesRoutes } from './routes/games.js'
 import { webhooksRoutes } from './routes/webhooks.js'
 import { startDeriveWorker, stopDeriveWorker, workerStatus } from './derive/worker.js'
@@ -62,6 +63,7 @@ app.get('/health', async (c) => {
 
 // Feature routes.
 app.route('/games', gamesRoutes) // Derived titles, served from Postgres
+app.route('/covers', coversRoutes) // Cover colours, computed once and shared
 app.route('/webhooks', webhooksRoutes) // IGDB change notifications
 
 /**

@@ -5,10 +5,10 @@
 
 	"//": "Deno tasks. Run with `deno task <name>`. The permission flags are Deno's security model: a script can only touch the network/env/filesystem you explicitly grant.",
 	"tasks": {
-		"dev": "deno run --watch --env-file --allow-net --allow-env --allow-read --allow-sys src/index.ts",
-		"start": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys src/index.ts",
+		"dev": "deno run --watch --env-file --allow-net --allow-env --allow-read --allow-sys --allow-ffi src/index.ts",
+		"start": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys --allow-ffi src/index.ts",
 		"typecheck": "deno check src/index.ts",
-		"test": "deno test --env-file --allow-net --allow-env --allow-read --allow-sys",
+		"test": "deno test --env-file --allow-net --allow-env --allow-read --allow-sys --allow-ffi",
 		"lint": "deno run -A npm:oxlint",
 		"format": "deno run -A npm:oxfmt",
 		"db:generate": "deno run -A npm:drizzle-kit generate",
@@ -16,6 +16,7 @@
 		"db:gen-mirror": "deno run --allow-read --allow-write --allow-env src/scripts/gen-mirror-schema.ts",
 		"db:dumps": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys src/scripts/load-dumps.ts",
 		"db:overrides": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys src/scripts/load-overrides.ts",
+		"colors:backfill": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys --allow-ffi src/scripts/backfill-colors.ts",
 		"derive:all": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys src/scripts/derive-all.ts",
 		"db:studio": "deno run -A npm:drizzle-kit studio"
 	},
@@ -39,5 +40,6 @@
 
 	"lint": {
 		"exclude": ["**/*.ts"]
-	}
+	},
+	"allowScripts": ["npm:sharp"]
 }

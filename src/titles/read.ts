@@ -336,19 +336,33 @@ export interface MirrorHealth {
 	lastDumpAt: string | null
 	titles: number
 	dirtyCount: number
+	/** Live titles whose cover has no colours computed yet. */
+	coversPending: number
 }
 
 export async function mirrorHealth(): Promise<MirrorHealth> {
 	const [row] = await sql<
-		Array<{ last_dump_at: Date | string | null; titles: number; dirty: number }>
+		Array<{
+			last_dump_at: Date | string | null
+			titles: number
+			dirty: number
+			covers_pending: number
+		}>
 	>`
 		select (select max(loaded_at) from dump_runs)   as last_dump_at,
 		       (select count(*)::int from titles)       as titles,
-		       (select count(*)::int from dirty_titles) as dirty
+		       (select count(*)::int from dirty_titles) as dirty,
+		       (select count(distinct t.cover_image_id)::int
+		        from titles t
+		        left join cover_colors c on c.image_id = t.cover_image_id
+		        where t.cover_image_id is not null
+		          and t.status = 'live'
+		          and c.image_id is null)               as covers_pending
 	`
 	return {
 		lastDumpAt: row?.last_dump_at ? new Date(row.last_dump_at).toISOString() : null,
 		titles: row?.titles ?? 0,
 		dirtyCount: row?.dirty ?? 0,
+		coversPending: row?.covers_pending ?? 0,
 	}
 }

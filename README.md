@@ -47,6 +47,7 @@ src/
     migrate.ts        Applies SQL migrations (run on deploy).
 
   derive/             === Canonical + overrides -> the titles we serve ===
+    colors.ts         Cover colours, extracted once and shared
     fold.ts           Which title does a game belong to? (pure)
     typeset.ts        Smart punctuation for display text (pure)
     index.ts          deriveTitle(): one title row from a loaded subtree (pure)
@@ -149,6 +150,23 @@ other nine still load.
 `./.dumps/fetch.sh` downloads the raw CSVs for offline work. They are
 gitignored (694 MB) and the presigned S3 URLs inside the saved metadata are
 stripped, because those URLs are credentials for the whole file.
+
+### Cover colours
+
+```bash
+deno task colors:backfill                  # every live title's cover
+deno task colors:backfill -- --limit=500   # a slice
+```
+
+Extracted once per IGDB image id and shared with everyone, rather than each
+user's first click decoding the same image. Image ids are content addressed —
+IGDB mints a new one when the art changes — so a stored answer can never go
+stale, which is why `/covers/:id/colors` is cached for a year.
+
+The backfill is opt-in and takes about two hours for the whole catalogue
+(267k distinct covers at ~35/sec). It is safe to stop and re-run: the pending
+set is a query, not a queue. Anything not yet backfilled is computed on first
+request instead.
 
 ### Building the derived titles
 
