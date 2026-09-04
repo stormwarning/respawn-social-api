@@ -1309,6 +1309,54 @@ Verified by inspecting `games.csv` directly.
 
 ---
 
+## 13.5 Title relations, added 2026-09-04
+
+The fold hides things. A page has to show what it hid, or the fold reads as
+data loss — someone looking for "Blood and Wine" on The Witcher 3's page needs
+to see it listed, and someone on The Last of Us needs a route to Part I.
+
+`GET /games/:id` now carries three more fields, all computed at read time from
+`title_members` and `igdb_games` rather than stored:
+
+| Field                         | What it answers                                                                  |
+| ----------------------------- | -------------------------------------------------------------------------------- |
+| `parent` + `relationToParent` | "This is a **Remake of** The Last of Us"                                         |
+| `folded`                      | What was absorbed and given no page: DLC, expansions, remasters, editions, ports |
+| `related`                     | Descendants that kept their own page                                             |
+
+**4,108 titles have a parent**: 2,072 expanded editions, 1,461 remakes, 496
+standalone expansions, 135 forks.
+
+Read-time joins, not stored columns — `titles` already carries ~370 MB of
+avoidable jsonb (§13.3) and these are small indexed lookups against tables the
+derive maintains anyway.
+
+**One performance trap worth remembering.** The first version of the
+`related` query filtered on `coalesce(version_parent, parent_game)`. There is no
+index on that expression, so it sequentially scanned all 374k games on every
+page load and took `/games/:id` from 2.0 ms to **28.7 ms** at p50. Testing the
+two columns separately — `version_parent in (…)` UNION `version_parent is null
+and parent_game in (…)`, which reproduces coalesce's precedence — makes each
+branch an index scan: 24.5 ms to 1.4 ms, and the endpoint back to 2.6 ms.
+Any future filter over a computed expression deserves an `explain analyze`
+before it ships.
+
+**Two display decisions live in the web app, not the API**, because both are
+presentation:
+
+- Ports are not rendered. They merge platforms and contribute nothing a reader
+  wants listed — "Halo (Xbox 360)" under Halo is noise. They stay in `folded`.
+- Members whose name is just the title's own are dropped. **4,430 exist** —
+  version children IGDB filed with no version title — and "Includes: Grand Theft
+  Auto V" on the Grand Theft Auto V page says nothing.
+
+The API does strip a redundant title prefix from folded names (`shortName`),
+since it is the side that holds both strings: "The Witcher 3: Wild Hunt – Blood
+and Wine" becomes "Blood and Wine" in a list on that title's own page, with the
+full name still on `displayName`.
+
+---
+
 ## 14. Open questions
 
 Resolved questions are kept, struck through, with where the answer landed —

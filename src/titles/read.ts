@@ -12,6 +12,7 @@ import { igdbRequest } from '../igdb/client.js'
 import { logger } from '../logger.js'
 import { upsertEntity } from '../mirror/upsert.js'
 import { normalize } from '../search/normalize.js'
+import { loadRelations, type FoldedMember, type TitleRef } from './relations.js'
 import { resolveTitle } from './resolve.js'
 
 /**
@@ -72,6 +73,20 @@ export interface Title {
 	sourceHash: string
 	/** Every IGDB id that resolves to this title, including its own. */
 	members: number[]
+	/**
+	 * The title this one is a version of — a remake, a standalone expansion, an
+	 * enhanced re-release. Null for a base game, which is most of them.
+	 */
+	parent: TitleRef | null
+	/** What this title is relative to `parent`: "Remake", "Expansion", … */
+	relationToParent: string | null
+	/**
+	 * What was folded INTO this title and given no page of its own: DLC,
+	 * expansions, remasters, special editions, ports.
+	 */
+	folded: FoldedMember[]
+	/** Descendants that kept their own page, so they stay reachable from here. */
+	related: TitleRef[]
 	/** Set when the request used a child id rather than the title's own. */
 	resolvedFrom?: number
 }
@@ -123,7 +138,7 @@ const TITLE_SELECT = sql`
 	from titles
 `
 
-function toTitle(row: TitleRow, members: number[]): Title {
+function toTitle(row: TitleRow, relations: Awaited<ReturnType<typeof loadRelations>>): Title {
 	const date = row.first_release_date
 	return {
 		v: TITLE_SHAPE_VERSION,
@@ -151,21 +166,18 @@ function toTitle(row: TitleRow, members: number[]): Title {
 		externalGames: row.external_games,
 		status: row.status,
 		sourceHash: row.source_hash,
-		members,
+		members: relations.memberIds,
+		parent: relations.parent,
+		relationToParent: relations.relationToParent,
+		folded: relations.folded,
+		related: relations.related,
 	}
-}
-
-async function membersOf(titleId: number): Promise<number[]> {
-	const rows = await sql<Array<{ game_id: string }>>`
-		select game_id from title_members where title_id = ${titleId} order by game_id
-	`
-	return rows.map((r) => Number(r.game_id))
 }
 
 async function loadTitle(titleId: number): Promise<Title | null> {
 	const [row] = await sql<TitleRow[]>`${TITLE_SELECT} where id = ${titleId}`
 	if (!row) return null
-	return toTitle(row, await membersOf(titleId))
+	return toTitle(row, await loadRelations(titleId))
 }
 
 /**
@@ -205,7 +217,7 @@ export async function getTitleBySlug(slug: string): Promise<Title | null> {
 		limit 1
 	`
 	if (!row) return null
-	return toTitle(row, await membersOf(Number(row.id)))
+	return toTitle(row, await loadRelations(Number(row.id)))
 }
 
 /**

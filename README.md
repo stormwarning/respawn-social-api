@@ -315,6 +315,11 @@ IGDB reorganises around it.
 and the names of everything folded into it. That is why searching "blood and
 wine" finds The Witcher 3 rather than nothing.
 
+A title response also says how it sits in that graph — what it is a remake or
+expansion **of**, what was folded **into** it, and which descendants kept their
+own page. A fold that hides things without showing what it hid reads as missing
+data.
+
 ---
 
 ## Deployment notes
