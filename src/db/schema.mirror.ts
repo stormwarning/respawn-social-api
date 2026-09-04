@@ -194,30 +194,6 @@ export const igdbInvolvedCompanies = pgTable(
 	],
 )
 
-export const igdbReleaseDates = pgTable(
-	'igdb_release_dates',
-	{
-		id: bigint('id', { mode: 'number' }).primaryKey(),
-		game: bigint('game', { mode: 'number' }),
-		createdAt: timestamp('created_at', { withTimezone: true }),
-		updatedAt: timestamp('updated_at', { withTimezone: true }),
-		platform: bigint('platform', { mode: 'number' }),
-		date: timestamp('date', { withTimezone: true }),
-		region: integer('region'),
-		y: integer('y'),
-		m: integer('m'),
-		human: text('human'),
-		checksum: uuid('checksum'),
-		status: bigint('status', { mode: 'number' }),
-		dateFormat: bigint('date_format', { mode: 'number' }),
-		releaseRegion: bigint('release_region', { mode: 'number' }),
-		d: integer('d'),
-		mirrorUpdatedAt: timestamp('mirror_updated_at', { withTimezone: true }).notNull().defaultNow(),
-		deletedAt: timestamp('deleted_at', { withTimezone: true }),
-	},
-	(t) => [index('igdb_release_dates_game_idx').on(t.game)],
-)
-
 export const igdbWebsites = pgTable(
 	'igdb_websites',
 	{

@@ -26,7 +26,6 @@ import type { Endpoint } from '../mirror/endpoints.js'
 const GAME_CHILD_TABLES: Partial<Record<Endpoint, string>> = {
 	covers: 'igdb_covers',
 	involved_companies: 'igdb_involved_companies',
-	release_dates: 'igdb_release_dates',
 	websites: 'igdb_websites',
 	external_games: 'igdb_external_games',
 	alternative_names: 'igdb_alternative_names',
@@ -123,10 +122,17 @@ export async function markDirtyForEndpoint(
 		return markFromGameIds(db, games, reason)
 	}
 
-	// platforms, genres: every title renders their names.
+	// platforms, genres: every title renders their names, so a change to one
+	// invalidates the lot.
+	//
+	// The `exists` guard is load-bearing. Without it this fires on every dump
+	// load whether or not anything changed — and platforms and genres almost
+	// never change, so every nightly run was queueing all 309,568 titles for
+	// nothing and provoking a full sweep to skip them again.
 	const result = await db.unsafe(`
 		insert into dirty_titles (title_id, reason)
 		select id, ${reasonLiteral(reason)} from titles
+		where exists (select 1 from ${changedIdsTable})
 		on conflict (title_id) do nothing
 	`)
 	return result.count

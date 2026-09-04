@@ -275,6 +275,19 @@ deactivated after five failures, an hour of downtime — all of it self-heals,
 because the dump is the whole truth and the loader diffs against it. Freshness
 degrades to 24 hours, never to silently wrong.
 
+On a deployment that is allowed to sleep, the dump is the _only_ mechanism:
+
+```bash
+deno task cron:refresh    # pull dumps, rebuild what changed, exit
+```
+
+Run it as a scheduled service rather than in-process. A sleeping container
+cannot hold the worker's `LISTEN` connection or fire an internal timer, and
+webhooks are worse there still — IGDB deactivates a webhook after five failed
+deliveries, and cold starts are how you collect five. A task that starts, works
+and exits needs none of that: no process to keep awake, no endpoint to
+authenticate, no HTTP timeout to fit inside.
+
 Both feed one queue (`dirty_titles`) drained by one worker. It listens for
 `NOTIFY` so a webhook lands immediately, and polls every 60 seconds because a
 title stuck dirty forever is a silent staleness bug.

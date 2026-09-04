@@ -65,11 +65,14 @@ const EnvSchema = z.object({
 	// that and before European morning traffic.
 	DUMP_LOAD_HOUR: z.coerce.number().int().min(0).max(23).default(6),
 
-	// The derive worker drains dirty_titles. Safe to leave on everywhere: with
-	// nothing dirty it sleeps on LISTEN.
+	// The derive worker drains dirty_titles over a LISTEN connection. Off by
+	// default because it needs a process that stays alive, and the deployment
+	// target is allowed to sleep — `deno task cron:refresh` does the same work
+	// on a schedule instead. Turn it on for a long-lived instance, where it
+	// makes an intra-day change visible in seconds rather than at the next run.
 	DERIVE_WORKER_ENABLED: z
 		.string()
-		.default('true')
+		.default('false')
 		.transform((v) => v === 'true'),
 
 	NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),

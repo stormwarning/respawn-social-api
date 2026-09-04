@@ -55,7 +55,6 @@ const INDEXED: Partial<Record<Endpoint, string[]>> = {
 	games: ['slug', 'parent_game', 'version_parent', 'game_type', 'updated_at'],
 	covers: ['game'],
 	involved_companies: ['game', 'company'],
-	release_dates: ['game'],
 	websites: ['game'],
 	external_games: ['game', 'uid'],
 	alternative_names: ['game'],

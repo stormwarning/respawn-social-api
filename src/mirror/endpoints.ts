@@ -63,6 +63,9 @@ interface EndpointSpec {
  *   - `companies.published` / `developed` — we get the same edges, per game,
  *     from `involved_companies`.
  *   - `companies.company_type_histories` — unused.
+ *   - `release_dates` entirely. It was mirrored for a year and read by nothing:
+ *     a title's date comes from `igdb_games.first_release_date`. 583k rows,
+ *     114 MB, and ~4s of every nightly load, for data no code path touched.
  */
 export const ENDPOINTS = {
 	games: {
@@ -213,25 +216,6 @@ export const ENDPOINTS = {
 			supporting: 'BOOLEAN',
 			porting: 'BOOLEAN',
 			checksum: 'UUID',
-		},
-	},
-	release_dates: {
-		columns: {
-			id: 'LONG',
-			game: 'LONG',
-			created_at: 'TIMESTAMP',
-			updated_at: 'TIMESTAMP',
-			platform: 'LONG',
-			date: 'TIMESTAMP',
-			region: 'INTEGER',
-			y: 'INTEGER',
-			m: 'INTEGER',
-			human: 'STRING',
-			checksum: 'UUID',
-			status: 'LONG',
-			date_format: 'LONG',
-			release_region: 'LONG',
-			d: 'INTEGER',
 		},
 	},
 	websites: {

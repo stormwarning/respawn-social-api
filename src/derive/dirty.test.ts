@@ -104,6 +104,34 @@ Deno.test('unknown ids queue nothing', async () => {
 	await cleanup()
 })
 
+Deno.test('an unchanged reference table queues nothing', async () => {
+	await seed()
+	// platforms and genres invalidate every title when they change, because
+	// every title renders their names. They almost never change — so firing that
+	// unconditionally queued all 309,568 titles on every nightly run and
+	// provoked a full sweep to skip them again.
+	assertEquals(await markDirtyForIds('platforms', [], 'test:none'), 0)
+	assertEquals(await dirtyIds(), [])
+	await cleanup()
+})
+
+Deno.test('a changed reference table still queues everything', async () => {
+	await seed()
+	const [before] = await sql<Array<{ n: number }>>`select count(*)::int as n from titles`
+
+	const queued = await markDirtyForIds('genres', [1], 'test:genre')
+
+	// Clean up before asserting: this marks the whole catalogue, and leaving
+	// 300k rows behind because an assertion threw would poison every later test.
+	await sql`delete from dirty_titles where reason = 'test:genre'`
+
+	// Every title, because every one of them renders a genre name. That is the
+	// right behaviour — the guard being tested only stops it firing when nothing
+	// actually changed.
+	assertEquals(queued, before?.n ?? -1)
+	await cleanup()
+})
+
 Deno.test('a reason that could carry SQL is refused', async () => {
 	// The reason is inlined rather than bound (postgres.js types `unsafe`
 	// parameters as `never` for an untyped client), so the validation is what

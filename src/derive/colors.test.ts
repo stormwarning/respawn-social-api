@@ -1,13 +1,7 @@
 import { assertEquals } from 'jsr:@std/assert'
 import postgres from 'postgres'
 import { config } from '../config.js'
-import {
-	ensureCoverColors,
-	extractCoverColors,
-	getCoverColors,
-	isValidImageId,
-	pendingCoverCount,
-} from './colors.js'
+import { ensureCoverColors, extractCoverColors, getCoverColors, isValidImageId } from './colors.js'
 
 const sql = postgres(config.DATABASE_URL, { max: 1, onnotice: () => {} })
 
@@ -88,12 +82,30 @@ Deno.test('ensureCoverColors stores on a miss and reads back on a hit', async ()
 	assertEquals(stored?.palette?.length, computed?.palette?.length)
 })
 
+/**
+ * Whether ONE image is pending, using the same predicate `pendingCoverIds`
+ * does.
+ *
+ * Scoped to a single id rather than compared against a global count, because
+ * `colors:backfill` may be running against the same database — it drains the
+ * pending set continuously, so any assertion on the total is a race that fails
+ * intermittently and tells you nothing.
+ */
+async function isPending(imageId: string): Promise<boolean> {
+	const rows = await sql<Array<{ pending: boolean }>>`
+		select true as pending
+		from titles t
+		left join cover_colors c on c.image_id = t.cover_image_id
+		where t.cover_image_id = ${imageId}
+		  and t.status = 'live'
+		  and c.image_id is null
+		limit 1
+	`
+	return rows.length > 0
+}
+
 Deno.test('the pending set is only live titles without colours', async () => {
 	await cleanup()
-	// Asserted as a delta rather than by looking for the id in a page of
-	// results: there are a quarter of a million pending covers and the set is
-	// ordered, so a synthetic id may sit well past any reasonable limit.
-	const before = await pendingCoverCount()
 
 	await sql`
 		insert into titles (
@@ -105,7 +117,7 @@ Deno.test('the pending set is only live titles without colours', async () => {
 			'[]', '[]', '{}', '{}', '{}', '{}', '{}', '[]', '[]', '[]', 'live', 'h', 1
 		)
 	`
-	assertEquals(await pendingCoverCount(), before + 1)
+	assertEquals(await isPending(TEST_IMAGE), true)
 
 	await sql`
 		insert into cover_colors (image_id, dominant, palette)
@@ -113,14 +125,14 @@ Deno.test('the pending set is only live titles without colours', async () => {
 	`
 	// Once a cover has colours it drops out — which is why the pending set is a
 	// query and not a queue: there is no state to keep in sync.
-	assertEquals(await pendingCoverCount(), before)
+	assertEquals(await isPending(TEST_IMAGE), false)
 
 	await sql`delete from cover_colors where image_id = ${TEST_IMAGE}`
-	assertEquals(await pendingCoverCount(), before + 1)
+	assertEquals(await isPending(TEST_IMAGE), true)
 
 	await sql`update titles set status = 'deleted' where id = ${TEST_TITLE}`
 	// A tombstoned title is nobody's page; do not spend a fetch on it.
-	assertEquals(await pendingCoverCount(), before)
+	assertEquals(await isPending(TEST_IMAGE), false)
 
 	await cleanup()
 })

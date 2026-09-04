@@ -17,6 +17,7 @@
 		"db:dumps": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys src/scripts/load-dumps.ts",
 		"db:overrides": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys src/scripts/load-overrides.ts",
 		"colors:backfill": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys --allow-ffi src/scripts/backfill-colors.ts",
+		"cron:refresh": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys src/scripts/refresh.ts",
 		"derive:all": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys src/scripts/derive-all.ts",
 		"db:studio": "deno run -A npm:drizzle-kit studio"
 	},

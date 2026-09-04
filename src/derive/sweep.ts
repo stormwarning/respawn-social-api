@@ -56,6 +56,11 @@ export async function sweep(options: SweepOptions = {}): Promise<SweepResult> {
 		const gone = options.only.filter((id) => !membership.byRoot.has(id))
 		if (gone.length > 0) {
 			await deleteTitles(gone)
+			// Clear their queue entries too. They are not in `rootIds`, so the loop
+			// below never reaches them — without this they stay dirty forever, and
+			// every subsequent run re-processes the same ids and reports them as
+			// still pending.
+			if (options.clearDirtyRows) await clearDirty(gone)
 			removed = gone.length
 		}
 		rootIds = rootIds.filter((id) => wanted.has(id))
