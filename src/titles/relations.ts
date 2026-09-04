@@ -93,6 +93,16 @@ export interface FoldedMember {
 	 * Falls back to the full name when there is no shared prefix to remove.
 	 */
 	shortName: string
+	/**
+	 * Which member this one hangs off, when that is not the title itself.
+	 *
+	 * The fold is transitive: World of Warcraft absorbs its expansions, and each
+	 * expansion's own Collector's Edition comes up with it. Seven members then
+	 * share the name "Collector's Edition" while being seven different products.
+	 * This is what tells them apart — "Cataclysm", "Shadowlands" — and it is null
+	 * for editions that belong to the base game directly.
+	 */
+	parentName: string | null
 	coverImageId: string | null
 	coverUrl: string | null
 	releaseYear: number | null
@@ -132,13 +142,19 @@ export async function loadRelations(titleId: number): Promise<TitleRelations> {
 				version_title: string | null
 				image_id: string | null
 				first_release_date: Date | string | null
+				parent_id: string | null
+				parent_name: string | null
 			}>
 		>`
 			select m.game_id, m.fold_type, g.name, g.version_title,
-			       c.image_id, g.first_release_date
+			       c.image_id, g.first_release_date,
+			       coalesce(g.version_parent, g.parent_game) as parent_id,
+			       coalesce(vp.name, pp.name)                as parent_name
 			from title_members m
 			join igdb_games g on g.id = m.game_id
 			left join igdb_covers c on c.id = g.cover
+			left join igdb_games vp on vp.id = g.version_parent
+			left join igdb_games pp on pp.id = g.parent_game and g.version_parent is null
 			where m.title_id = ${titleId}
 			order by g.first_release_date nulls last, m.game_id
 		`,
@@ -232,6 +248,7 @@ export async function loadRelations(titleId: number): Promise<TitleRelations> {
 			label: FOLD_LABEL[foldType] ?? 'Edition',
 			displayName: typeset(name),
 			shortName: typeset(stripTitlePrefix(name, rootName)),
+			parentName: parentNameOf(row, titleId, rootName),
 			coverImageId: row.image_id,
 			coverUrl: coverUrl(row.image_id, 't_cover_small_2x'),
 			releaseYear: year(row.first_release_date),
@@ -269,6 +286,27 @@ export function stripTitlePrefix(name: string, titleName: string | null): string
 		.replace(/^[\s:–—\-·|]+/, '')
 		.trim()
 	return rest.length > 0 ? rest : name
+}
+
+/**
+ * The name of the member this one belongs to, or null when that is the title.
+ *
+ * Stripped of the title's own prefix as well, so a World of Warcraft expansion
+ * reads as "Cataclysm" rather than "World of Warcraft: Cataclysm" — the title
+ * is already the page you are on.
+ */
+function parentNameOf(
+	row: { parent_id: string | null; parent_name: string | null },
+	titleId: number,
+	rootName: string | null,
+): string | null {
+	if (row.parent_id === null || row.parent_name === null) return null
+	if (Number(row.parent_id) === titleId) return null
+
+	const stripped = stripTitlePrefix(row.parent_name, rootName).trim()
+	// If stripping left the parent's whole name, it shares nothing with the
+	// title and is likelier to confuse than clarify.
+	return stripped.length > 0 && stripped !== row.parent_name ? typeset(stripped) : null
 }
 
 function toRef(row: {

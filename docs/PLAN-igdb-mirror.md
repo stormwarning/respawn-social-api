@@ -1353,7 +1353,23 @@ presentation:
 The API does strip a redundant title prefix from folded names (`shortName`),
 since it is the side that holds both strings: "The Witcher 3: Wild Hunt – Blood
 and Wine" becomes "Blood and Wine" in a list on that title's own page, with the
-full name still on `displayName`.
+full name still on `displayName`. It also reports `parentName` — which member an
+entry hangs off, when that is not the title itself.
+
+**`parentName` exists because the fold is transitive**, and that turns out to
+matter more than it sounds. World of Warcraft absorbs its expansions, and each
+expansion's own Collector's Edition comes up with it: eleven folded editions
+arrive, **eight of them named "Collector's Edition"**, and they are eight
+different products. Listing them verbatim is noise. Collapsing them to one entry
+reads tidily and quietly claims WoW shipped a single Collector's Edition.
+
+`apps/web/src/lib/folded.ts` resolves it: reduce each name to its bare form
+(IGDB spells one of them "WoW: Battle for Azeroth - Collector's Edition"), then
+qualify **only the ones that still collide**. WoW gets "Cataclysm: Collector's
+Edition", "Shadowlands: Collector's Edition" and so on, with the base game's
+left bare. Qualifying unconditionally was tried first and was worse — it turned
+The Witcher 3's unique "10th Anniversary Edition" into "Complete Edition: 10th
+Anniversary Edition" for no benefit.
 
 ---
 
