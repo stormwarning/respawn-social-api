@@ -3,9 +3,9 @@
 		"deno": {
 			"settings": {
 				"deno": {
-					"enable": true,
-				},
-			},
+					"enable": true
+				}
+			}
 		},
 		"oxlint": {
 			"initialization_options": {
@@ -15,55 +15,40 @@
 					"disableNestedConfig": false,
 					"fixKind": "safe_fix",
 					"typeAware": true,
-					"unusedDisableDirectives": "deny",
-				},
-			},
+					"unusedDisableDirectives": "deny"
+				}
+			}
 		},
 		"oxfmt": {
 			"initialization_options": {
 				"settings": {
-					"fmt.configPath": null,
-				},
-			},
-		},
+					"fmt.configPath": null
+				}
+			}
+		}
 	},
 	"languages": {
 		"JavaScript": {
-			"language_servers": [
-				"deno",
-				"!typescript-language-server",
-				"!vtsls",
-				"!eslint",
-			],
-			"formatter": "language_server",
+			"language_servers": ["deno", "!typescript-language-server", "!vtsls", "!eslint"],
+			"formatter": "language_server"
 		},
 		"TypeScript": {
-			"language_servers": [
-				"deno",
-				"!typescript-language-server",
-				"!vtsls",
-				"!eslint",
-			],
+			"language_servers": ["deno", "!typescript-language-server", "!vtsls", "!eslint"],
 			"format_on_save": "on",
 			"prettier": {
-				"allowed": false,
+				"allowed": false
 			},
 			"formatter": [
 				{
 					"language_server": {
-						"name": "oxfmt",
-					},
-				},
-			],
+						"name": "oxfmt"
+					}
+				}
+			]
 		},
 		"TSX": {
-			"language_servers": [
-				"deno",
-				"!typescript-language-server",
-				"!vtsls",
-				"!eslint",
-			],
-			"formatter": "language_server",
-		},
-	},
+			"language_servers": ["deno", "!typescript-language-server", "!vtsls", "!eslint"],
+			"formatter": "language_server"
+		}
+	}
 }
