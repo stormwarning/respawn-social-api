@@ -38,8 +38,16 @@ src/
 
   db/
     schema.ts         All database tables (the source of truth).
+    schema.mirror.ts  GENERATED — the igdb_* canonical tables.
     client.ts         The Postgres connection pool + Drizzle client.
     migrate.ts        Applies SQL migrations (run on deploy).
+
+  mirror/             === The local IGDB mirror ===
+    endpoints.ts      What we mirror, and its types. Source of truth for the
+                      generated schema, the staging DDL, and the drift guard.
+    dumps.ts          The Data Partner dump API + the schema drift check.
+    load.ts           Streams a dump into staging, diffs on checksum, applies
+                      only what changed. Never hard-deletes.
 
   igdb/               === The "don't hammer IGDB" core ===
     token.ts          Fetches/caches/refreshes the Twitch (IGDB) access token.
@@ -93,9 +101,30 @@ compose service, so no extra config is needed. (Host port is **5433** to avoid
 clashing with any native Postgres already running on 5432.)
 
 > If you change `src/db/schema.ts`, regenerate the migration with
-> `deno task db:generate`, then run `deno task db:migrate` again.
+> `deno task db:generate`, then run `deno task db:migrate` again. If you change
+> `src/mirror/endpoints.ts`, run `deno task db:gen-mirror` first.
 
 To stop the database: `docker compose down` (add `-v` to also wipe the data).
+
+### Loading the IGDB mirror
+
+```bash
+deno task db:dumps                    # every endpoint, downloaded from IGDB
+deno task db:dumps games covers       # just these
+deno task db:dumps -- --local         # read the CSVs already in .dumps/
+deno task db:dumps -- --force         # reload even if the dump is unchanged
+```
+
+A full build is ~1.2 GB and takes about half a minute. It is safe to re-run:
+the loader diffs against IGDB's per-row `checksum`, so a run with no upstream
+changes reports zero changes and touches nothing. An endpoint whose column
+shape has drifted is skipped with an error rather than guessed at, and the
+other nine still load.
+
+`./.dumps/fetch.sh` downloads the raw CSVs for offline work. They are
+gitignored (694 MB) and the presigned S3 URLs inside the saved metadata are
+stripped, because those URLs are credentials for the whole file.
+
 
 ---
 

@@ -13,3 +13,6 @@ node_modules/
 
 # Drizzle (generated SQL migrations are committed; this is just the temp journal lock)
 drizzle/meta/_journal.json.lock
+
+# Local IGDB data dumps (large, refetchable)
+.dumps/

@@ -43,23 +43,41 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
  */
 export async function igdbRequest<T = unknown>(endpoint: string, body: string): Promise<T> {
 	// queue.add schedules the work; it won't run until the limiter allows it.
-	const result = await queue.add(() => executeWithRetry<T>(endpoint, body))
+	const result = await queue.add(() => executeWithRetry<T>(endpoint, { method: 'POST', body }))
 	// p-queue types `add` as possibly returning void (if the queue is cleared);
 	// that never happens here, so assert the real type.
 	return result as T
 }
 
-async function executeWithRetry<T>(endpoint: string, body: string, attempt = 1): Promise<T> {
+/**
+ * GET an IGDB endpoint that isn't an apicalypse query.
+ *
+ * The Data Partner dump endpoints (`/dumps`, `/dumps/{endpoint}`) are plain REST
+ * GETs, not apicalypse POSTs, but they draw on the same 4-req/s credential
+ * budget — so they go through the same queue.
+ *
+ * @param endpoint e.g. "dumps" or "dumps/games"
+ */
+export async function igdbGet<T = unknown>(endpoint: string): Promise<T> {
+	const result = await queue.add(() => executeWithRetry<T>(endpoint, { method: 'GET' }))
+	return result as T
+}
+
+async function executeWithRetry<T>(
+	endpoint: string,
+	init: { method: string; body?: string },
+	attempt = 1,
+): Promise<T> {
 	const token = await getAccessToken()
 
 	const res = await fetch(`${IGDB_BASE_URL}/${endpoint}`, {
-		method: 'POST',
+		method: init.method,
 		headers: {
 			'Client-ID': config.TWITCH_CLIENT_ID,
 			Authorization: `Bearer ${token}`,
 			Accept: 'application/json',
 		},
-		body,
+		body: init.body,
 	})
 
 	if (res.ok) {
@@ -70,7 +88,7 @@ async function executeWithRetry<T>(endpoint: string, body: string, attempt = 1):
 	if (res.status === 401 && attempt <= MAX_RETRIES) {
 		logger.warn('IGDB returned 401; refreshing token and retrying')
 		invalidateToken()
-		return executeWithRetry<T>(endpoint, body, attempt + 1)
+		return executeWithRetry<T>(endpoint, init, attempt + 1)
 	}
 
 	// 429: we somehow exceeded the rate limit — exponential backoff then retry.
@@ -79,7 +97,7 @@ async function executeWithRetry<T>(endpoint: string, body: string, attempt = 1):
 		const backoffMs = 2 ** attempt * 250 // 500ms, 1s, 2s
 		logger.warn(`IGDB 429 rate limited; backing off ${backoffMs}ms`)
 		await sleep(backoffMs)
-		return executeWithRetry<T>(endpoint, body, attempt + 1)
+		return executeWithRetry<T>(endpoint, init, attempt + 1)
 	}
 
 	throw new Error(`IGDB ${endpoint} failed: ${res.status} ${await res.text()}`)
