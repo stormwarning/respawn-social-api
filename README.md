@@ -85,6 +85,7 @@ src/
 
   routes/
     games.ts          GET /games/:id, /games/slug/:slug, /games/:id/members,
+                      /games/browse,
                       /games/search
 ```
 

@@ -344,6 +344,80 @@ export async function searchTitles(query: string, limit = 20): Promise<SearchHit
 	}))
 }
 
+export interface BrowseFilters {
+	/** A single release year. */
+	year?: number
+	/** The first year of a decade: 2010 for the 2010s. */
+	decade?: number
+	page: number
+	limit: number
+}
+
+export interface BrowseResult {
+	items: TitleSummary[]
+	/** Titles matching the filter, across every page. */
+	total: number
+	page: number
+	pageSize: number
+}
+
+/**
+ * One page of the catalogue, most popular first.
+ *
+ * The total comes from a window function rather than a second query: the
+ * ordered scan over the filtered set happens anyway, and Postgres counts it as
+ * it goes. Ties on popularity — most of the long tail sits at zero — break on
+ * id so a page boundary never shuffles between requests.
+ */
+export async function browseTitles(filters: BrowseFilters): Promise<BrowseResult> {
+	const { year, decade, page, limit } = filters
+	const offset = (page - 1) * limit
+
+	const where =
+		year !== undefined
+			? sql`and release_year = ${year}`
+			: decade !== undefined
+				? sql`and release_year between ${decade} and ${decade + 9}`
+				: sql``
+
+	const rows = await sql<
+		Array<{
+			id: string
+			slug: string
+			display_name: string
+			cover_image_id: string | null
+			release_year: number | null
+			platforms: TitlePlatform[]
+			total: string
+		}>
+	>`
+		select id, slug, display_name, cover_image_id, release_year, platforms,
+		       count(*) over () as total
+		from titles
+		where status = 'live' ${where}
+		order by popularity desc, id
+		limit ${limit} offset ${offset}
+	`
+
+	return {
+		items: rows.map((row) => ({
+			v: TITLE_SHAPE_VERSION,
+			id: Number(row.id),
+			slug: row.slug,
+			displayName: row.display_name,
+			coverImageId: row.cover_image_id,
+			// The grid renders these as full tiles, unlike search's 72px thumbnails.
+			coverUrl: coverUrl(row.cover_image_id),
+			releaseYear: row.release_year,
+			platforms: row.platforms.map((p) => p.displayName),
+		})),
+		// A page past the end returns no rows, and with them no window count.
+		total: rows[0] ? Number(rows[0].total) : 0,
+		page,
+		pageSize: limit,
+	}
+}
+
 export interface MirrorHealth {
 	lastDumpAt: string | null
 	titles: number

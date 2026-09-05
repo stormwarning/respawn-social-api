@@ -185,6 +185,14 @@ export const titles = pgTable(
 		index('titles_slug_idx').on(t.slug),
 		index('titles_status_idx').on(t.status),
 		index('titles_popularity_idx').on(t.popularity),
+		// The browse pages: "most popular, optionally within a year or decade".
+		// Partial on status so the long tail of tombstones never enters the scan.
+		index('titles_browse_popularity_idx')
+			.on(t.popularity.desc())
+			.where(sql`${t.status} = 'live'`),
+		index('titles_browse_year_idx')
+			.on(t.releaseYear, t.popularity.desc())
+			.where(sql`${t.status} = 'live'`),
 		check('titles_status', sql`${t.status} in ('live','deleted')`),
 	],
 )

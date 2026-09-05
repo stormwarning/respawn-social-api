@@ -1,90 +1,97 @@
 {
-	"version": "7",
-	"dialect": "postgresql",
-	"entries": [
-		{
-			"idx": 0,
-			"version": "7",
-			"when": 1781972951306,
-			"tag": "0000_amused_logan",
-			"breakpoints": true
-		},
-		{
-			"idx": 1,
-			"version": "7",
-			"when": 1782349471395,
-			"tag": "0001_shallow_wolfsbane",
-			"breakpoints": true
-		},
-		{
-			"idx": 2,
-			"version": "7",
-			"when": 1788475337186,
-			"tag": "0002_grey_marvel_zombies",
-			"breakpoints": true
-		},
-		{
-			"idx": 3,
-			"version": "7",
-			"when": 1788475347425,
-			"tag": "0003_igdb_games_relation_gin",
-			"breakpoints": true
-		},
-		{
-			"idx": 4,
-			"version": "7",
-			"when": 1788476508738,
-			"tag": "0004_military_smasher",
-			"breakpoints": true
-		},
-		{
-			"idx": 5,
-			"version": "7",
-			"when": 1788476509064,
-			"tag": "0005_title_terms_trgm",
-			"breakpoints": true
-		},
-		{
-			"idx": 6,
-			"version": "7",
-			"when": 1788476509065,
-			"tag": "0006_trgm_threshold",
-			"breakpoints": true
-		},
-		{
-			"idx": 7,
-			"version": "7",
-			"when": 1788481706404,
-			"tag": "0007_cooing_gamora",
-			"breakpoints": true
-		},
-		{
-			"idx": 8,
-			"version": "7",
-			"when": 1788484761341,
-			"tag": "0008_modern_charles_xavier",
-			"breakpoints": true
-		},
-		{
-			"idx": 9,
-			"version": "7",
-			"when": 1788490652710,
-			"tag": "0009_wild_mysterio",
-			"breakpoints": true
-		},
-		{
-			"idx": 10,
-			"version": "7",
-			"when": 1788490652711,
-			"tag": "0010_title_terms_lookup",
-			"breakpoints": true
-		},
-		{
-			"idx": 11,
-			"version": "7",
-			"when": 1788543130299,
-			"tag": "0011_sharp_mentor",
-			"breakpoints": true
-		}
-	]
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1781972951306,
+      "tag": "0000_amused_logan",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1782349471395,
+      "tag": "0001_shallow_wolfsbane",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788475337186,
+      "tag": "0002_grey_marvel_zombies",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788475347425,
+      "tag": "0003_igdb_games_relation_gin",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788476508738,
+      "tag": "0004_military_smasher",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788476509064,
+      "tag": "0005_title_terms_trgm",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788476509065,
+      "tag": "0006_trgm_threshold",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788481706404,
+      "tag": "0007_cooing_gamora",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788484761341,
+      "tag": "0008_modern_charles_xavier",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788490652710,
+      "tag": "0009_wild_mysterio",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788490652711,
+      "tag": "0010_title_terms_lookup",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788543130299,
+      "tag": "0011_sharp_mentor",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1788576401723,
+      "tag": "0012_titles_browse",
+      "breakpoints": true
+    }
+  ]
 }
