@@ -1,0 +1,8 @@
+{
+	"$schema": "https://railway.com/railway.schema.json",
+	"deploy": {
+		"preDeployCommand": [
+			"deno run --allow-net --allow-env --allow-read --allow-sys src/db/migrate.ts"
+		]
+	}
+}

@@ -342,6 +342,10 @@ data.
   — the in-memory rate limiter and token cache need a persistent process.
 - A `Dockerfile` is included (based on the official `denoland/deno` image; Deno
   runs the TypeScript directly, so there's no compile step).
+- `railway.json` runs the migrations as a **pre-deploy command**, so a new
+  deployment applies any SQL in `./drizzle` before it takes traffic. Nothing to
+  run by hand after a push; the deploy fails (and the old container stays up)
+  if a migration does.
 - Set all `.env` values as platform secrets. Set `ALLOWED_ORIGINS` to your
   front-end's real origin(s).
 - Single instance is assumed. The in-memory rate limiter and token cache
