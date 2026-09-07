@@ -17,7 +17,9 @@ const DLC = 999_500_002
 const EDITION = 999_500_003
 const REMAKE = 999_500_004
 const PORT = 999_500_005
-const IDS = [BASE, DLC, EDITION, REMAKE, PORT]
+const SEQUEL = 999_500_006
+const IDS = [BASE, DLC, EDITION, REMAKE, PORT, SEQUEL]
+const COLLECTION = 999_500_900
 
 async function cleanup() {
 	await sql`delete from title_terms where title_id = any(${IDS})`
@@ -53,8 +55,14 @@ async function seed() {
 			(${DLC},     'Relations Test Game - The Extra Bit', 'rtg-extra', ${GameType.DLC_ADDON}, '2016-01-01', gen_random_uuid()),
 			(${EDITION}, 'Relations Test Game: Deluxe', 'rtg-deluxe', ${GameType.MAIN_GAME}, '2016-06-01', gen_random_uuid()),
 			(${REMAKE},  'Relations Test Game Remade', 'rtg-remade', ${GameType.REMAKE}, '2022-01-01', gen_random_uuid()),
-			(${PORT},    'Relations Test Game (Switch)', 'rtg-switch', ${GameType.PORT}, '2019-01-01', gen_random_uuid())
+			(${PORT},    'Relations Test Game (Switch)', 'rtg-switch', ${GameType.PORT}, '2019-01-01', gen_random_uuid()),
+			(${SEQUEL},  'Relations Test Game 2', 'relations-test-game-2', ${GameType.MAIN_GAME}, '2018-01-01', gen_random_uuid())
 	`
+	// The series, recorded the two ways IGDB records it: the base game carries
+	// the modern array, the sequel only the legacy scalar. Neither alone finds
+	// the other, which is the case worth pinning.
+	await sql`update igdb_games set collections = array[${COLLECTION}]::bigint[] where id = ${BASE}`
+	await sql`update igdb_games set collection = ${COLLECTION} where id = ${SEQUEL}`
 	await sql`update igdb_games set parent_game = ${BASE} where id in (${DLC}, ${REMAKE}, ${PORT})`
 	await sql`
 		update igdb_games set version_parent = ${BASE}, version_title = 'Deluxe Edition'
@@ -63,6 +71,7 @@ async function seed() {
 
 	await insertTitle(BASE, 'relations-test-game', 'Relations Test Game', 2015)
 	await insertTitle(REMAKE, 'rtg-remade', 'Relations Test Game Remade', 2022)
+	await insertTitle(SEQUEL, 'relations-test-game-2', 'Relations Test Game 2', 2018)
 
 	await sql`
 		insert into title_members (game_id, title_id, fold_type) values
@@ -70,7 +79,8 @@ async function seed() {
 			(${DLC}, ${BASE}, 'dlc'),
 			(${EDITION}, ${BASE}, 'version'),
 			(${PORT}, ${BASE}, 'port'),
-			(${REMAKE}, ${REMAKE}, 'root')
+			(${REMAKE}, ${REMAKE}, 'root'),
+			(${SEQUEL}, ${SEQUEL}, 'root')
 	`
 }
 
@@ -181,6 +191,43 @@ Deno.test('a title with no relations returns empty, not null', async () => {
 	const relations = await loadRelations(REMAKE)
 	assertEquals(relations.folded, [])
 	assertEquals(relations.related, [])
+	assertEquals(relations.collection, [])
+	await cleanup()
+})
+
+Deno.test("the series is found across both of IGDB's collection fields", async () => {
+	await seed()
+	const relations = await loadRelations(BASE)
+
+	// The sequel is neither a version nor a descendant of the base game, so
+	// nothing but the collection lookup reaches it.
+	assertEquals(
+		relations.related.map((r) => r.id),
+		[REMAKE],
+	)
+	assertEquals(
+		relations.collection.map((r) => r.id),
+		[SEQUEL],
+	)
+	// A sibling is not a remake OF the page you are on, whatever its own type.
+	assertEquals(relations.collection[0]?.relation, null)
+
+	// And it runs the other way: the sequel's scalar finds the base game's array.
+	const fromSequel = await loadRelations(SEQUEL)
+	assertEquals(
+		fromSequel.collection.map((r) => r.id),
+		[BASE],
+	)
+
+	await cleanup()
+})
+
+Deno.test('a title in no collection gets an empty series, not the whole catalogue', async () => {
+	await seed()
+	// REMAKE carries neither field; an unguarded lookup would match on an empty
+	// array and return every game IGDB has.
+	const relations = await loadRelations(REMAKE)
+	assertEquals(relations.collection, [])
 	await cleanup()
 })
 

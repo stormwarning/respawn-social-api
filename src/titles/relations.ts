@@ -17,6 +17,9 @@ import type { FoldType } from '../derive/fold.js'
  *   parent  — "this is a Remake of …", with a link. 4,108 titles have one.
  *   folded  — what was absorbed INTO this title, grouped by how.
  *   related — descendants that kept their own page, so they are reachable.
+ *   collection — the rest of the series, which is a different relationship
+ *     entirely: siblings, not descendants. Zelda titles are not versions of
+ *     each other, and nothing above finds them.
  *
  * Read-time joins rather than stored columns. They are small indexed lookups
  * against tables the derive already maintains, and `titles` is already carrying
@@ -119,6 +122,8 @@ export interface TitleRelations {
 	folded: FoldedMember[]
 	/** Descendants that kept their own page. */
 	related: TitleRef[]
+	/** Other titles in the same IGDB collection — the series. Most popular first. */
+	collection: TitleRef[]
 }
 
 const year = (date: Date | string | null): number | null =>
@@ -127,13 +132,20 @@ const year = (date: Date | string | null): number | null =>
 const num = (value: string | null): number | null => (value === null ? null : Number(value))
 
 /**
+ * A series rarely runs longer than this, and a page cannot show more anyway.
+ * 73 of IGDB's 10,851 collections exceed it, and the cut is by popularity, so
+ * what a long franchise loses is its obscure tail rather than its recent half.
+ */
+const COLLECTION_LIMIT = 50
+
+/**
  * Load a title's relations.
  *
- * Three queries, run together. Each is an indexed lookup returning a handful of
+ * Four queries, run together. Each is an indexed lookup returning a handful of
  * rows — a title has 1–15 members and rarely more than a few descendants.
  */
 export async function loadRelations(titleId: number): Promise<TitleRelations> {
-	const [memberRows, parentRows, relatedRows] = await Promise.all([
+	const [memberRows, parentRows, relatedRows, collectionRows] = await Promise.all([
 		sql<
 			Array<{
 				game_id: string
@@ -222,6 +234,58 @@ export async function loadRelations(titleId: number): Promise<TitleRelations> {
 			order by t.first_release_date nulls last, t.id
 			limit 50
 		`,
+
+		// The rest of the series.
+		//
+		// IGDB says which collections a game belongs to two ways: `collections`,
+		// the current array, and `collection`, the older scalar it has not
+		// backfilled away. Rows carry one, the other, or both, so a lookup that
+		// reads only the array silently misses whole series.
+		//
+		// Anchored on the root game rather than the member set: an edition of a
+		// game inherits the series from the game, and pulling in every member's
+		// collections only adds ways for a compilation to drag in something
+		// unrelated. Peers are then mapped back through `title_members`, because
+		// a series member may itself have folded into a title with a different id.
+		//
+		// `(t.popularity + 0) as rank` is load-bearing, not noise. Ordering by the
+		// bare column lets the planner match `titles_popularity_idx` and "helpfully"
+		// walk all 309k live titles backwards hoping 50 series members turn up
+		// early — 1319 ms measured, against 0.63 ms for this form. The expression
+		// is not indexable, so the small peer set is joined first and sorted after.
+		// Wrapping the CTEs in `materialized` fences instead costs 25 ms.
+		sql<
+			Array<{
+				id: string
+				slug: string
+				display_name: string
+				cover_image_id: string | null
+				release_year: number | null
+				game_type: string | null
+			}>
+		>`
+			with own as (
+				select coalesce(collections, '{}'::bigint[])
+				       || case when collection is null then '{}'::bigint[] else array[collection] end
+				       as ids
+				from igdb_games where id = ${titleId}
+			),
+			peers as (
+				select g.id
+				from igdb_games g, own
+				where own.ids <> '{}'::bigint[]
+				  and (g.collections && own.ids or g.collection = any(own.ids))
+			)
+			select distinct t.id, t.slug, t.display_name, t.cover_image_id,
+			       t.release_year, (t.popularity + 0) as rank, g.game_type
+			from peers p
+			join title_members m on m.game_id = p.id
+			join titles t on t.id = m.title_id
+			join igdb_games g on g.id = t.id
+			where t.id <> ${titleId} and t.status = 'live'
+			order by rank desc nulls last, t.id
+			limit ${COLLECTION_LIMIT}
+		`,
 	])
 
 	const memberIds: number[] = []
@@ -267,6 +331,10 @@ export async function loadRelations(titleId: number): Promise<TitleRelations> {
 		relationToParent: parentRow ? relationLabel(num(parentRow.own_game_type)) : null,
 		folded,
 		related: relatedRows.map(toRef),
+		// `relation` is "what is this ref TO the title that returned it", and a
+		// series sibling is not a version of anything here — its own game type
+		// describes its relationship to some other game entirely.
+		collection: collectionRows.map((row) => ({ ...toRef(row), relation: null })),
 	}
 }
 

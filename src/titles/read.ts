@@ -87,6 +87,13 @@ export interface Title {
 	folded: FoldedMember[]
 	/** Descendants that kept their own page, so they stay reachable from here. */
 	related: TitleRef[]
+	/**
+	 * The rest of the series: other titles sharing an IGDB collection with this
+	 * one. Siblings rather than descendants — Ocarina of Time and Majora's Mask
+	 * are neither a version nor a child of each other. Most popular first, so a
+	 * page showing only the first few shows the ones worth showing.
+	 */
+	collection: TitleRef[]
 	/** Set when the request used a child id rather than the title's own. */
 	resolvedFrom?: number
 }
@@ -171,6 +178,7 @@ function toTitle(row: TitleRow, relations: Awaited<ReturnType<typeof loadRelatio
 		relationToParent: relations.relationToParent,
 		folded: relations.folded,
 		related: relations.related,
+		collection: relations.collection,
 	}
 }
 

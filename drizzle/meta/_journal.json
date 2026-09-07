@@ -92,6 +92,13 @@
       "when": 1788576401723,
       "tag": "0012_titles_browse",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788576401724,
+      "tag": "0013_igdb_games_collections",
+      "breakpoints": true
     }
   ]
 }
