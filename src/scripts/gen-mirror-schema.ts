@@ -58,6 +58,7 @@ const INDEXED: Partial<Record<Endpoint, string[]>> = {
 	websites: ['game'],
 	external_games: ['game', 'uid'],
 	alternative_names: ['game'],
+	game_localizations: ['game'],
 }
 
 function renderTable(endpoint: Endpoint): string {

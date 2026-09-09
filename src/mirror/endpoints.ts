@@ -63,6 +63,8 @@ interface EndpointSpec {
  *   - `companies.published` / `developed` — we get the same edges, per game,
  *     from `involved_companies`.
  *   - `companies.company_type_histories` — unused.
+ *   - `regions` entirely. Three stable rows (2 ko-KR, 3 ja-JP, 4 EU); the
+ *     one reader (`src/titles/relations.ts`) maps the ids by hand.
  *   - `release_dates` entirely. It was mirrored for a year and read by nothing:
  *     a title's date comes from `igdb_games.first_release_date`. 583k rows,
  *     114 MB, and ~4s of every nightly load, for data no code path touched.
@@ -252,6 +254,20 @@ export const ENDPOINTS = {
 			name: 'STRING',
 			comment: 'STRING',
 			game: 'LONG',
+			checksum: 'UUID',
+		},
+	},
+	// Native-script titles per region ("夢工場ドキドキパニック" for ja-JP). Read
+	// for the subtitle of a folded original and indexed as search terms.
+	game_localizations: {
+		columns: {
+			id: 'LONG',
+			name: 'STRING',
+			cover: 'LONG',
+			game: 'LONG',
+			region: 'LONG',
+			created_at: 'TIMESTAMP',
+			updated_at: 'TIMESTAMP',
 			checksum: 'UUID',
 		},
 	},
