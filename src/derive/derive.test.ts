@@ -35,6 +35,7 @@ function input(members: DeriveMember[], partial: Partial<DeriveInput> = {}): Der
 		rootId: root.game.id,
 		members,
 		alternativeNames: [],
+		localizations: [],
 		developers: [],
 		publishers: [],
 		websites: [],

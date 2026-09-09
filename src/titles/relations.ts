@@ -55,6 +55,7 @@ export function relationLabel(gameType: number | null): string | null {
 /** How a folded member reads in a list. */
 const FOLD_LABEL: Record<FoldType, string> = {
 	root: 'Game',
+	original: 'Original',
 	dlc: 'DLC',
 	expansion: 'Expansion',
 	remaster: 'Remaster',
@@ -81,10 +82,21 @@ export interface TitleRef {
 	relation: string | null
 }
 
+/**
+ * IGDB's `regions` table, by hand. It is three stable rows, and the only thing
+ * read from it is the BCP-47 tag a `lang` attribute wants. Region 4 is "EU",
+ * which is not a language, so it has no entry.
+ */
+const REGION_LANG: Record<number, string> = {
+	2: 'ko-KR',
+	3: 'ja-JP',
+}
+const JAPAN_REGION_ID = 3
+
 export interface FoldedMember {
 	id: number
 	foldType: FoldType
-	/** "DLC", "Expansion", "Remaster", "Edition", "Port". */
+	/** "DLC", "Expansion", "Remaster", "Edition", "Port", "Original". */
 	label: string
 	/** Typeset, in full. An edition shows its version title ("Collector's Edition"). */
 	displayName: string
@@ -109,6 +121,14 @@ export interface FoldedMember {
 	coverImageId: string | null
 	coverUrl: string | null
 	releaseYear: number | null
+	/**
+	 * The member's native-script title ("夢工場ドキドキパニック"), when IGDB has
+	 * one. Japanese is preferred — 33.5k of the 48k localizations are ja-JP —
+	 * and any other region is a fallback. Shown as a subtitle for an `original`.
+	 */
+	localizedName: string | null
+	/** BCP-47 tag for `localizedName`, for a `lang` attribute. */
+	localizedLang: string | null
 }
 
 export interface TitleRelations {
@@ -156,17 +176,27 @@ export async function loadRelations(titleId: number): Promise<TitleRelations> {
 				first_release_date: Date | string | null
 				parent_id: string | null
 				parent_name: string | null
+				localized_name: string | null
+				localized_region: string | null
 			}>
 		>`
 			select m.game_id, m.fold_type, g.name, g.version_title,
 			       c.image_id, g.first_release_date,
 			       coalesce(g.version_parent, g.parent_game) as parent_id,
-			       coalesce(vp.name, pp.name)                as parent_name
+			       coalesce(vp.name, pp.name)                as parent_name,
+			       l.name                                    as localized_name,
+			       l.region                                  as localized_region
 			from title_members m
 			join igdb_games g on g.id = m.game_id
 			left join igdb_covers c on c.id = g.cover
 			left join igdb_games vp on vp.id = g.version_parent
 			left join igdb_games pp on pp.id = g.parent_game and g.version_parent is null
+			left join lateral (
+				select name, region from igdb_game_localizations
+				where game = m.game_id and deleted_at is null and name is not null
+				order by (region = ${JAPAN_REGION_ID}) desc, region
+				limit 1
+			) l on true
 			where m.title_id = ${titleId}
 			order by g.first_release_date nulls last, m.game_id
 		`,
@@ -316,6 +346,11 @@ export async function loadRelations(titleId: number): Promise<TitleRelations> {
 			coverImageId: row.image_id,
 			coverUrl: coverUrl(row.image_id, 't_cover_small_2x'),
 			releaseYear: year(row.first_release_date),
+			localizedName: row.localized_name,
+			localizedLang:
+				row.localized_name === null || row.localized_region === null
+					? null
+					: (REGION_LANG[Number(row.localized_region)] ?? null),
 		})
 	}
 

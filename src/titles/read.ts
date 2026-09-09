@@ -31,7 +31,7 @@ import { resolveTitle } from './resolve.js'
  */
 
 /** Bump when the response shape changes, so the web app can assert on it. */
-export const TITLE_SHAPE_VERSION = 1
+export const TITLE_SHAPE_VERSION = 2
 
 const IMAGE_BASE = 'https://images.igdb.com/igdb/image/upload'
 

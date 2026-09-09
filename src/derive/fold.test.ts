@@ -170,13 +170,33 @@ Deno.test('an override cycle terminates', () => {
 })
 
 Deno.test('foldTypeOf reads the member type', () => {
-	assertEquals(foldTypeOf(node(1), 1, false), 'root')
-	assertEquals(foldTypeOf(node(2, { gameType: GameType.PORT }), 1, false), 'port')
-	assertEquals(foldTypeOf(node(2, { gameType: GameType.DLC_ADDON }), 1, false), 'dlc')
-	assertEquals(foldTypeOf(node(2, { gameType: GameType.EXPANSION }), 1, false), 'expansion')
-	assertEquals(foldTypeOf(node(2, { gameType: GameType.REMASTER }), 1, false), 'remaster')
-	assertEquals(foldTypeOf(node(2, { versionParent: 1 }), 1, false), 'version')
-	assertEquals(foldTypeOf(node(2, { gameType: GameType.DLC_ADDON }), 1, true), 'override')
+	const root = node(1)
+	assertEquals(foldTypeOf(root, root, false), 'root')
+	assertEquals(foldTypeOf(node(2, { gameType: GameType.PORT }), root, false), 'port')
+	assertEquals(foldTypeOf(node(2, { gameType: GameType.DLC_ADDON }), root, false), 'dlc')
+	assertEquals(foldTypeOf(node(2, { gameType: GameType.EXPANSION }), root, false), 'expansion')
+	assertEquals(foldTypeOf(node(2, { gameType: GameType.REMASTER }), root, false), 'remaster')
+	assertEquals(foldTypeOf(node(2, { versionParent: 1 }), root, false), 'version')
+	assertEquals(foldTypeOf(node(2, { gameType: GameType.DLC_ADDON }), root, true), 'override')
+})
+
+Deno.test("the root's own parent, folded in by override, is the original", () => {
+	// Super Mario Bros. 2 (a port of Doki-doki Panic in IGDB) crowned as the
+	// title: the original folds under the port it spawned.
+	const original = node(41233)
+	const port = node(1067, { gameType: GameType.PORT, parentGame: 41233 })
+	assertEquals(foldTypeOf(original, port, true), 'original')
+	// Unrelated overridden members still read as hand-folded editions.
+	assertEquals(foldTypeOf(node(3), port, true), 'override')
+})
+
+Deno.test('a crowned port keeps its title and its original folds into it', () => {
+	const ctx = context([node(41233), node(1067, { gameType: GameType.PORT, parentGame: 41233 })], {
+		1067: { action: 'keep_separate', targetGameId: null },
+		41233: { action: 'fold_into', targetGameId: 1067 },
+	})
+	assertEquals(resolveRoot(1067, ctx), 1067)
+	assertEquals(resolveRoot(41233, ctx), 1067)
 })
 
 Deno.test('contributionOf routes each fold type', () => {
@@ -185,6 +205,7 @@ Deno.test('contributionOf routes each fold type', () => {
 	assertEquals(contributionOf('remaster'), 'editions')
 	assertEquals(contributionOf('version'), 'editions')
 	assertEquals(contributionOf('override'), 'editions')
+	assertEquals(contributionOf('original'), 'original')
 	assertEquals(contributionOf('port'), 'platforms-only')
 	assertEquals(contributionOf('root'), 'platforms-only')
 })

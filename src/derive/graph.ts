@@ -109,7 +109,7 @@ export function computeMembership(graph: Graph): Membership {
 			rootId = node.id
 		}
 		rootOf.set(node.id, rootId)
-		const foldType = foldTypeOf(node, rootId, graph.overrides.has(node.id))
+		const foldType = foldTypeOf(node, graph.nodes.get(rootId) ?? node, graph.overrides.has(node.id))
 		const members = byRoot.get(rootId)
 		if (members) members.push({ gameId: node.id, foldType })
 		else byRoot.set(rootId, [{ gameId: node.id, foldType }])

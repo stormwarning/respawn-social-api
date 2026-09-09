@@ -153,46 +153,51 @@ export async function loadInputs(
 		for (const member of membership.byRoot.get(rootId) ?? []) memberIds.push(member.gameId)
 	}
 
-	const [gameRows, altRows, companyRows, websiteRows, externalRows, patchRows] = await Promise.all([
-		sql<GameRow[]>`${GAME_SELECT} where g.id = any(${memberIds})`,
-		sql<Array<{ game: string; name: string | null }>>`
+	const [gameRows, altRows, locRows, companyRows, websiteRows, externalRows, patchRows] =
+		await Promise.all([
+			sql<GameRow[]>`${GAME_SELECT} where g.id = any(${memberIds})`,
+			sql<Array<{ game: string; name: string | null }>>`
 			select game, name from igdb_alternative_names
 			where game = any(${memberIds}) and deleted_at is null and name is not null
 		`,
-		// Developers and publishers come from the ROOT only. A port's porting
-		// studio is not a developer of the title.
-		sql<
-			Array<{
-				game: string
-				name: string | null
-				developer: boolean | null
-				publisher: boolean | null
-			}>
-		>`
+			sql<Array<{ game: string; region: string | null; name: string }>>`
+			select game, region, name from igdb_game_localizations
+			where game = any(${memberIds}) and deleted_at is null and name is not null
+		`,
+			// Developers and publishers come from the ROOT only. A port's porting
+			// studio is not a developer of the title.
+			sql<
+				Array<{
+					game: string
+					name: string | null
+					developer: boolean | null
+					publisher: boolean | null
+				}>
+			>`
 			select ic.game, c.name, ic.developer, ic.publisher
 			from igdb_involved_companies ic
 			join igdb_companies c on c.id = ic.company
 			where ic.game = any(${rootIds}) and ic.deleted_at is null and c.name is not null
 		`,
-		sql<Array<{ game: string; url: string | null; type: string | null }>>`
+			sql<Array<{ game: string; url: string | null; type: string | null }>>`
 			select game, url, type from igdb_websites
 			where game = any(${rootIds}) and deleted_at is null
 		`,
-		sql<
-			Array<{
-				game: string
-				url: string | null
-				uid: string | null
-				external_game_source: string | null
-			}>
-		>`
+			sql<
+				Array<{
+					game: string
+					url: string | null
+					uid: string | null
+					external_game_source: string | null
+				}>
+			>`
 			select game, url, uid, external_game_source from igdb_external_games
 			where game = any(${rootIds}) and deleted_at is null
 		`,
-		sql<Array<{ game_id: string; patch: Record<string, unknown> }>>`
+			sql<Array<{ game_id: string; patch: Record<string, unknown> }>>`
 			select game_id, patch from title_patches where game_id = any(${rootIds})
 		`,
-	])
+		])
 
 	const gameById = new Map<number, GameRow>()
 	for (const row of gameRows) gameById.set(Number(row.id), row)
@@ -219,6 +224,7 @@ export async function loadInputs(
 	for (const row of similarRows) similarById.set(Number(row.id), row)
 
 	const altsByGame = groupBy(altRows, (r) => Number(r.game))
+	const locsByGame = groupBy(locRows, (r) => Number(r.game))
 	const companiesByGame = groupBy(companyRows, (r) => Number(r.game))
 	const websitesByGame = groupBy(websiteRows, (r) => Number(r.game))
 	const externalByGame = groupBy(externalRows, (r) => Number(r.game))
@@ -231,12 +237,16 @@ export async function loadInputs(
 
 		const members: DeriveMember[] = []
 		const alternativeNames: Array<{ gameId: number; name: string }> = []
+		const localizations: Array<{ gameId: number; region: number; name: string }> = []
 		for (const { gameId, foldType } of membership.byRoot.get(rootId) ?? []) {
 			const row = gameById.get(gameId)
 			if (!row) continue
 			members.push({ game: toMemberGame(row), foldType })
 			for (const alt of altsByGame.get(gameId) ?? []) {
 				if (alt.name) alternativeNames.push({ gameId, name: alt.name })
+			}
+			for (const loc of locsByGame.get(gameId) ?? []) {
+				localizations.push({ gameId, region: num(loc.region) ?? 0, name: loc.name })
 			}
 		}
 		if (members.length === 0 || members[0]?.foldType !== 'root') continue
@@ -279,6 +289,7 @@ export async function loadInputs(
 			rootId,
 			members,
 			alternativeNames,
+			localizations,
 			developers,
 			publishers,
 			websites,

@@ -21,7 +21,7 @@ import { typeset } from './typeset.js'
  * part of `source_hash`, so bumping it invalidates every title on the next
  * sweep without needing to work out which ones were affected.
  */
-export const DERIVE_VERSION = 3
+export const DERIVE_VERSION = 4
 
 export interface MemberGame {
 	id: number
@@ -50,6 +50,8 @@ export interface DeriveInput {
 	members: DeriveMember[]
 	/** Alternative names across the root and its members. */
 	alternativeNames: Array<{ gameId: number; name: string }>
+	/** Native-script titles per IGDB region, across the root and its members. */
+	localizations: Array<{ gameId: number; region: number; name: string }>
 	developers: string[]
 	publishers: string[]
 	websites: TitleWebsite[]
@@ -145,6 +147,10 @@ export function deriveTitle(input: DeriveInput, refs: DeriveRefs): DerivedTitle 
 			} else if (bucket === 'expansions') {
 				expansions.add(typeset(raw))
 				terms.add(raw, 'member_name', 'C')
+			} else if (bucket === 'original') {
+				// The game this title was ported from, shown as its subtitle rather
+				// than listed as an edition. Its old name should still find the page.
+				terms.add(raw, 'member_name', 'B')
 			} else {
 				// A port's name still ought to find the title, even though it is
 				// not displayed anywhere.
@@ -159,6 +165,12 @@ export function deriveTitle(input: DeriveInput, refs: DeriveRefs): DerivedTitle 
 	terms.add(name, 'root_name', 'A')
 	for (const alt of input.alternativeNames) {
 		const value = alt.name?.trim()
+		if (value) terms.add(value, 'alt_name', 'B')
+	}
+	// 夢工場ドキドキパニック should find Super Mario Bros. 2 as readily as "Doki
+	// Doki Panic" does.
+	for (const loc of input.localizations) {
+		const value = loc.name.trim()
 		if (value) terms.add(value, 'alt_name', 'B')
 	}
 
@@ -263,6 +275,7 @@ function sourceHash(input: DeriveInput): string {
 			.map(({ game, foldType }) => `${game.id}:${foldType}:${game.checksum ?? ''}`)
 			.sort(),
 		...input.alternativeNames.map((a) => `alt:${a.gameId}:${a.name}`).sort(),
+		...input.localizations.map((l) => `loc:${l.gameId}:${l.region}:${l.name}`).sort(),
 	]
 	return createHash('sha256').update(parts.join('\n')).digest('hex').slice(0, 32)
 }

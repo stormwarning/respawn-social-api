@@ -143,11 +143,13 @@ export async function deriveOne(gameId: number): Promise<DeriveOneResult> {
 
 	await loadDescendants(rootId, nodes)
 	overrides = await loadOverrides([...nodes.keys()])
+	const rootNode = nodes.get(rootId)
+	if (!rootNode) return { titleId: null, removed: [] }
 
 	const members: Array<{ gameId: number; foldType: FoldType }> = []
 	for (const node of nodes.values()) {
 		if (resolveRoot(node.id, context) !== rootId) continue
-		members.push({ gameId: node.id, foldType: foldTypeOf(node, rootId, overrides.has(node.id)) })
+		members.push({ gameId: node.id, foldType: foldTypeOf(node, rootNode, overrides.has(node.id)) })
 	}
 	members.sort((a, b) => {
 		if (a.foldType === 'root') return -1

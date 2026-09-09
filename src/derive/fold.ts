@@ -50,7 +50,15 @@ export const NEVER_TYPES: ReadonlySet<number> = new Set([
 	GameType.UPDATE,
 ])
 
-export type FoldType = 'root' | 'port' | 'dlc' | 'expansion' | 'remaster' | 'version' | 'override'
+export type FoldType =
+	| 'root'
+	| 'original'
+	| 'port'
+	| 'dlc'
+	| 'expansion'
+	| 'remaster'
+	| 'version'
+	| 'override'
 
 export interface GameNode {
 	id: number
@@ -141,8 +149,13 @@ export function resolveRoot(gameId: number, ctx: FoldContext): number | null {
  * the child's type keeps this consistent with `resolveRoot` by construction,
  * and reads straight off an indexed column instead of nine GIN lookups.
  */
-export function foldTypeOf(game: GameNode, rootId: number, overridden: boolean): FoldType {
-	if (game.id === rootId) return 'root'
+export function foldTypeOf(game: GameNode, root: GameNode, overridden: boolean): FoldType {
+	if (game.id === root.id) return 'root'
+	// The game the root was itself derived from, now folded underneath it. Only
+	// an override can arrange this — a root with a live parent would have
+	// climbed — and it is how a crowned port carries its original: Super Mario
+	// Bros. 2 is IGDB's port of Doki-doki Panic, and the page is SMB2's.
+	if (game.id === root.parentGame || game.id === root.versionParent) return 'original'
 	if (overridden) return 'override'
 	if (game.versionParent !== null) return 'version'
 
@@ -163,8 +176,13 @@ export function foldTypeOf(game: GameNode, rootId: number, overridden: boolean):
 }
 
 /** Where a member's name goes on the derived title. */
-export function contributionOf(foldType: FoldType): 'editions' | 'expansions' | 'platforms-only' {
+export function contributionOf(
+	foldType: FoldType,
+): 'editions' | 'expansions' | 'original' | 'platforms-only' {
 	switch (foldType) {
+		case 'original':
+			// Shown as the title's subtitle, not as an edition of itself.
+			return 'original'
 		case 'dlc':
 		case 'expansion':
 			return 'expansions'
