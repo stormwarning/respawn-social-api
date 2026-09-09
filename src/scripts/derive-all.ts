@@ -29,6 +29,10 @@ if (flags.has('--fresh')) {
 let lastLogged = 0
 const result = await sweep({
 	limit,
+	// Every title the sweep touches is fresh afterwards, so its queue entry is
+	// stale. Without this a full rebuild leaves the whole backlog behind and the
+	// worker re-derives all 309k titles again for nothing.
+	clearDirtyRows: true,
 	onProgress(done, total) {
 		if (done - lastLogged < 20_000 && done !== total) return
 		lastLogged = done
@@ -41,6 +45,7 @@ console.log(`titles          ${result.titles.toLocaleString()}`)
 console.log(`  written       ${result.written.toLocaleString()}`)
 console.log(`  skipped       ${result.skipped.toLocaleString()} (source_hash unchanged)`)
 console.log(`  root missing  ${result.missing.toLocaleString()}`)
+console.log(`  removed       ${result.removed.toLocaleString()} (no longer a root)`)
 console.log(`games ignored   ${result.ignored.toLocaleString()} (bundles, mods, packs, hidden)`)
 console.log(`elapsed         ${(result.elapsedMs / 1000).toFixed(1)}s`)
 

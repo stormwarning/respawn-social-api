@@ -1,4 +1,271 @@
 {
-	"$comment": "Manual corrections to fold decisions, consulted by resolveRoot before anything else. `fold_into` needs a targetGameId; `keep_separate` gives a game its own title despite IGDB folding it; `hide` drops it entirely. Every entry needs a note — a fold decision with no rationale cannot be reviewed later.",
-	"overrides": []
+	"$comment": "Manual corrections to fold decisions, consulted by resolveRoot before anything else. `fold_into` needs a targetGameId; `keep_separate` gives a game its own title despite IGDB folding it; `hide` drops it entirely. Every entry needs a note — a fold decision with no rationale cannot be reviewed later. Entries marked `generated: \"crown\"` come from `deno task overrides:crown` (a port that far outranks the original it was ported from becomes the title, and the original folds under it); that task rewrites exactly those entries and leaves hand-written ones alone, and skips any pair a hand-written entry already covers.",
+	"overrides": [
+		{
+			"gameId": 20444,
+			"action": "keep_separate",
+			"targetGameId": null,
+			"generated": "crown",
+			"note": "crown: Tales of Graces f (45) outranks parent Tales of Graces (15), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 1211,
+			"action": "fold_into",
+			"targetGameId": 20444,
+			"generated": "crown",
+			"note": "crown: Tales of Graces f (45) outranks parent Tales of Graces (15), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 6067,
+			"action": "keep_separate",
+			"targetGameId": null,
+			"generated": "crown",
+			"note": "crown: Decap Attack (23) outranks parent Magical Hat no Buttobi Turbo! Daibouken (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 4472,
+			"action": "fold_into",
+			"targetGameId": 6067,
+			"generated": "crown",
+			"note": "crown: Decap Attack (23) outranks parent Magical Hat no Buttobi Turbo! Daibouken (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 138796,
+			"action": "keep_separate",
+			"targetGameId": null,
+			"generated": "crown",
+			"note": "crown: Chronos: Before the Ashes (23.5) outranks parent Chronos (1), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 18974,
+			"action": "fold_into",
+			"targetGameId": 138796,
+			"generated": "crown",
+			"note": "crown: Chronos: Before the Ashes (23.5) outranks parent Chronos (1), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 79247,
+			"action": "keep_separate",
+			"targetGameId": null,
+			"generated": "crown",
+			"note": "crown: 3D Pinball: Space Cadet (51) outranks parent Full Tilt! Pinball (6), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 23335,
+			"action": "fold_into",
+			"targetGameId": 79247,
+			"generated": "crown",
+			"note": "crown: 3D Pinball: Space Cadet (51) outranks parent Full Tilt! Pinball (6), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 23094,
+			"action": "keep_separate",
+			"targetGameId": null,
+			"generated": "crown",
+			"note": "crown: Pocket Fighter (23) outranks parent Super Gem Fighter Mini Mix (6), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 39314,
+			"action": "fold_into",
+			"targetGameId": 23094,
+			"generated": "crown",
+			"note": "crown: Pocket Fighter (23) outranks parent Super Gem Fighter Mini Mix (6), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 2735,
+			"action": "keep_separate",
+			"targetGameId": null,
+			"generated": "crown",
+			"note": "crown: Balloon Fight (114) outranks parent Vs. Balloon Fight (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 40516,
+			"action": "fold_into",
+			"targetGameId": 2735,
+			"generated": "crown",
+			"note": "crown: Balloon Fight (114) outranks parent Vs. Balloon Fight (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 3666,
+			"action": "keep_separate",
+			"targetGameId": null,
+			"generated": "crown",
+			"note": "crown: Ice Climber (133) outranks parent Vs. Ice Climber (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 41079,
+			"action": "fold_into",
+			"targetGameId": 3666,
+			"generated": "crown",
+			"note": "crown: Ice Climber (133) outranks parent Vs. Ice Climber (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 1067,
+			"action": "keep_separate",
+			"targetGameId": null,
+			"generated": "crown",
+			"note": "crown: Super Mario Bros. 2 (556) outranks parent Yume Koujou: Doki-doki Panic (6), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 41233,
+			"action": "fold_into",
+			"targetGameId": 1067,
+			"generated": "crown",
+			"note": "crown: Super Mario Bros. 2 (556) outranks parent Yume Koujou: Doki-doki Panic (6), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 54535,
+			"action": "keep_separate",
+			"targetGameId": null,
+			"generated": "crown",
+			"note": "crown: Bionic Commando (26) outranks parent Hitler no Fukkatsu: Top Secret (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 48580,
+			"action": "fold_into",
+			"targetGameId": 54535,
+			"generated": "crown",
+			"note": "crown: Bionic Commando (26) outranks parent Hitler no Fukkatsu: Top Secret (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 1119,
+			"action": "keep_separate",
+			"targetGameId": null,
+			"generated": "crown",
+			"note": "crown: Castlevania III: Dracula's Curse (154) outranks parent Akumajou Densetsu (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 151162,
+			"action": "fold_into",
+			"targetGameId": 1119,
+			"generated": "crown",
+			"note": "crown: Castlevania III: Dracula's Curse (154) outranks parent Akumajou Densetsu (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 1654,
+			"action": "keep_separate",
+			"targetGameId": null,
+			"generated": "crown",
+			"note": "crown: Streets of Rage 3 (101) outranks parent Bare Knuckle III (6), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 151541,
+			"action": "fold_into",
+			"targetGameId": 1654,
+			"generated": "crown",
+			"note": "crown: Streets of Rage 3 (101) outranks parent Bare Knuckle III (6), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 3051,
+			"action": "keep_separate",
+			"targetGameId": null,
+			"generated": "crown",
+			"note": "crown: The Bugs Bunny Crazy Castle (22) outranks parent Roger Rabbit (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 153448,
+			"action": "fold_into",
+			"targetGameId": 3051,
+			"generated": "crown",
+			"note": "crown: The Bugs Bunny Crazy Castle (22) outranks parent Roger Rabbit (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 25821,
+			"action": "keep_separate",
+			"targetGameId": null,
+			"generated": "crown",
+			"note": "crown: Hatsune Miku: Project Diva Future Tone (26) outranks parent Hatsune Miku: Project Diva Arcade Future Tone (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 178136,
+			"action": "fold_into",
+			"targetGameId": 25821,
+			"generated": "crown",
+			"note": "crown: Hatsune Miku: Project Diva Future Tone (26) outranks parent Hatsune Miku: Project Diva Arcade Future Tone (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 10633,
+			"action": "keep_separate",
+			"targetGameId": null,
+			"generated": "crown",
+			"note": "crown: Nintendo World Cup (31) outranks parent Nekketsu High School Dodgeball Club: Soccer Story (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 191639,
+			"action": "fold_into",
+			"targetGameId": 10633,
+			"generated": "crown",
+			"note": "crown: Nintendo World Cup (31) outranks parent Nekketsu High School Dodgeball Club: Soccer Story (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 6558,
+			"action": "keep_separate",
+			"targetGameId": null,
+			"generated": "crown",
+			"note": "crown: River City Ransom (54) outranks parent Downtown Nekketsu Story (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 191641,
+			"action": "fold_into",
+			"targetGameId": 6558,
+			"generated": "crown",
+			"note": "crown: River City Ransom (54) outranks parent Downtown Nekketsu Story (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 11452,
+			"action": "keep_separate",
+			"targetGameId": null,
+			"generated": "crown",
+			"note": "crown: Revelations: Persona (29) outranks parent Megami Ibunroku Persona (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 240506,
+			"action": "fold_into",
+			"targetGameId": 11452,
+			"generated": "crown",
+			"note": "crown: Revelations: Persona (29) outranks parent Megami Ibunroku Persona (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 6439,
+			"action": "keep_separate",
+			"targetGameId": null,
+			"generated": "crown",
+			"note": "crown: Track & Field (38) outranks parent Hyper Olympic (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 278573,
+			"action": "fold_into",
+			"targetGameId": 6439,
+			"generated": "crown",
+			"note": "crown: Track & Field (38) outranks parent Hyper Olympic (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 8448,
+			"action": "keep_separate",
+			"targetGameId": null,
+			"generated": "crown",
+			"note": "crown: Maui Mallard in Cold Shadow (32) outranks parent Donald in Maui Mallard (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 371101,
+			"action": "fold_into",
+			"targetGameId": 8448,
+			"generated": "crown",
+			"note": "crown: Maui Mallard in Cold Shadow (32) outranks parent Donald in Maui Mallard (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 28386,
+			"action": "keep_separate",
+			"targetGameId": null,
+			"generated": "crown",
+			"note": "crown: The Legend of the Mystical Ninja (22) outranks parent Ganbare Goemon: Yukihime Kyuushutsu Emaki (0), evaluated 2026-09-09"
+		},
+		{
+			"gameId": 371833,
+			"action": "fold_into",
+			"targetGameId": 28386,
+			"generated": "crown",
+			"note": "crown: The Legend of the Mystical Ninja (22) outranks parent Ganbare Goemon: Yukihime Kyuushutsu Emaki (0), evaluated 2026-09-09"
+		}
+	]
 }

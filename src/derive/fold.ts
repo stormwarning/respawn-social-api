@@ -155,7 +155,16 @@ export function foldTypeOf(game: GameNode, root: GameNode, overridden: boolean):
 	// an override can arrange this — a root with a live parent would have
 	// climbed — and it is how a crowned port carries its original: Super Mario
 	// Bros. 2 is IGDB's port of Doki-doki Panic, and the page is SMB2's.
-	if (game.id === root.parentGame || game.id === root.versionParent) return 'original'
+	//
+	// Not when the member is a version child, though. IGDB has a few cycles
+	// where a game's `parent_game` is its own "Classic Edition" (Pico Park,
+	// HyperBowl), and an edition is an edition whatever the parent pointer says.
+	if (
+		game.versionParent === null &&
+		(game.id === root.parentGame || game.id === root.versionParent)
+	) {
+		return 'original'
+	}
 	if (overridden) return 'override'
 	if (game.versionParent !== null) return 'version'
 

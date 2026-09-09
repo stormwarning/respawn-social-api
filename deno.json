@@ -16,6 +16,7 @@
 		"db:gen-mirror": "deno run --allow-read --allow-write --allow-env src/scripts/gen-mirror-schema.ts",
 		"db:dumps": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys src/scripts/load-dumps.ts",
 		"db:overrides": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys src/scripts/load-overrides.ts",
+		"overrides:crown": "deno run --env-file --allow-net --allow-env --allow-read --allow-write --allow-sys src/scripts/crown-ports.ts",
 		"colors:backfill": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys --allow-ffi src/scripts/backfill-colors.ts",
 		"cron:refresh": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys src/scripts/refresh.ts",
 		"derive:all": "deno run --env-file --allow-net --allow-env --allow-read --allow-sys src/scripts/derive-all.ts",

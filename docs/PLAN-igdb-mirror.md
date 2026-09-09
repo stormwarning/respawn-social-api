@@ -423,18 +423,37 @@ resolveRoot(gameId):
 
 Port `foldRelations` verbatim in behaviour:
 
-| Relation walked                            | Platforms | Name goes to                      | Cover goes to           | `fold_type` |
-| ------------------------------------------ | --------- | --------------------------------- | ----------------------- | ----------- |
-| `ports`                                    | merge     | —                                 | —                       | `port`      |
-| `dlcs`                                     | merge     | `expansions_normalized`           | `extra_cover_image_ids` | `dlc`       |
-| `expansions`                               | merge     | `expansions_normalized`           | `extra_cover_image_ids` | `expansion` |
-| `remasters`                                | merge     | `editions`                        | `extra_cover_image_ids` | `remaster`  |
-| version children (`version_parent = root`) | —         | `editions` (uses `version_title`) | —                       | `version`   |
-| `fold_overrides.fold_into` targets         | merge     | `editions`                        | `extra_cover_image_ids` | `override`  |
+| Relation walked                                                | Platforms | Name goes to                                                 | Cover goes to           | `fold_type` |
+| -------------------------------------------------------------- | --------- | ------------------------------------------------------------ | ----------------------- | ----------- |
+| `ports`                                                        | merge     | —                                                            | —                       | `port`      |
+| `dlcs`                                                         | merge     | `expansions_normalized`                                      | `extra_cover_image_ids` | `dlc`       |
+| `expansions`                                                   | merge     | `expansions_normalized`                                      | `extra_cover_image_ids` | `expansion` |
+| `remasters`                                                    | merge     | `editions`                                                   | `extra_cover_image_ids` | `remaster`  |
+| version children (`version_parent = root`)                     | —         | `editions` (uses `version_title`)                            | —                       | `version`   |
+| `fold_overrides.fold_into` targets                             | merge     | `editions`                                                   | `extra_cover_image_ids` | `override`  |
+| the root's own `parent_game`/`version_parent`, folded under it | merge     | subtitle (read-time, via `game_localizations`) + search term | `extra_cover_image_ids` | `original`  |
 
 Children with `game_type ∈ NEVER_CATEGORIES` are skipped even when reachable.
 Children with `deleted_at` set are skipped. Every folded child (including the
 root itself with `fold_type = 'root'`) gets a row in `title_members`.
+
+**Crowned ports.** IGDB files a localized release as a PORT of the game it
+was adapted from — Super Mario Bros. 2 is a port of Yume Koujou: Doki-doki
+Panic, Castlevania III of Akumajou Densetsu — so the climb above names every
+such page after the obscure original. `deno task overrides:crown`
+(`src/scripts/crown-ports.ts`) finds differently named ports whose popularity
+(§6.6) is ≥20 and ≥3× their parent's, where the parent is itself a root, and
+writes a `keep_separate` for the port plus a `fold_into` for the original into
+`data/overrides/folds.json`, marked `generated: "crown"`. The original then
+lands in `title_members` as `original`; `loadRelations` reads its
+native-script name from `igdb_game_localizations` (ja-JP preferred) for the
+page subtitle. Nineteen titles on the 2026-09 catalogue.
+
+It is a generator, not a live rule, on purpose: rating counts drift, and a
+root that flipped overnight would change a title's id under every user record
+pointing at it. Frozen in git, the decision changes only when someone re-runs
+the task and commits the diff. Hand-written overrides on either side of a
+pair take precedence and remove the pair from consideration.
 
 ### 6.4 Smart punctuation
 

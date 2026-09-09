@@ -49,6 +49,9 @@ const FoldsFile = z.object({
 				gameId: z.number().int(),
 				action: z.enum(['fold_into', 'keep_separate', 'hide']),
 				targetGameId: z.number().int().nullable().default(null),
+				// Written by `deno task overrides:crown`, which replaces exactly these
+				// on its next run and leaves everything else alone.
+				generated: z.literal('crown').optional(),
 				note: z.string().min(1),
 			})
 			.refine((o) => o.action !== 'fold_into' || o.targetGameId !== null, {

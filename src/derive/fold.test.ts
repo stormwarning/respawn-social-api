@@ -190,6 +190,14 @@ Deno.test("the root's own parent, folded in by override, is the original", () =>
 	assertEquals(foldTypeOf(node(3), port, true), 'override')
 })
 
+Deno.test('a version child is an edition even when the root points back at it', () => {
+	// IGDB cycle: Pico Park's parent_game is "Pico Park: Classic Edition", whose
+	// version_parent is Pico Park. The edition is not the original.
+	const root = node(33027, { gameType: GameType.EXPANDED_GAME, parentGame: 288208 })
+	const edition = node(288208, { versionParent: 33027 })
+	assertEquals(foldTypeOf(edition, root, false), 'version')
+})
+
 Deno.test('a crowned port keeps its title and its original folds into it', () => {
 	const ctx = context([node(41233), node(1067, { gameType: GameType.PORT, parentGame: 41233 })], {
 		1067: { action: 'keep_separate', targetGameId: null },

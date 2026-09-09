@@ -64,6 +64,18 @@ export async function sweep(options: SweepOptions = {}): Promise<SweepResult> {
 			removed = gone.length
 		}
 		rootIds = rootIds.filter((id) => wanted.has(id))
+	} else {
+		// A full rebuild has the same obligation: a title whose id no longer
+		// resolves to itself — folded by a new override, or by IGDB re-parenting
+		// it — must go, or its stale row keeps serving from search and browse
+		// while `title_members` says the id belongs to someone else.
+		const rows = await sql<Array<{ id: string }>>`select id from titles`
+		const gone = rows.map((r) => Number(r.id)).filter((id) => !membership.byRoot.has(id))
+		if (gone.length > 0) {
+			await deleteTitles(gone)
+			if (options.clearDirtyRows) await clearDirty(gone)
+			removed = gone.length
+		}
 	}
 
 	if (options.limit !== undefined) rootIds = rootIds.slice(0, options.limit)
