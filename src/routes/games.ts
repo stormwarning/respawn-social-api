@@ -9,7 +9,7 @@ import {
 	searchTitles,
 	type Title,
 } from '../titles/read.js'
-import { resolveTitles } from '../titles/resolve.js'
+import { resolveTitles, withReleaseDates } from '../titles/resolve.js'
 
 /**
  * Game routes.
@@ -117,6 +117,9 @@ gamesRoutes.get('/browse', async (c) => {
  * records at a time — a profile, a backlog — to group them by the title each
  * one currently belongs to. Batched because one request per record would cost
  * more than rendering the page.
+ *
+ * Each result also carries its title's `firstReleaseDate`, which the activity
+ * feed uses to hold back logs of games that are not out yet.
  */
 const MAX_RESOLVE_IDS = 200
 
@@ -135,7 +138,7 @@ gamesRoutes.get('/resolve', async (c) => {
 	}
 
 	try {
-		const resolved = await resolveTitles(ids)
+		const resolved = await withReleaseDates(await resolveTitles(ids))
 		return c.json({ resolved: Object.fromEntries(resolved) })
 	} catch (err) {
 		logger.error(err, 'resolve failed')

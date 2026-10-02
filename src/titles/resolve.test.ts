@@ -2,7 +2,7 @@ import { assertEquals } from 'jsr:@std/assert'
 import postgres from 'postgres'
 import { config } from '../config.js'
 import { applyDeleteRedirect } from '../mirror/redirect.js'
-import { resolveTitle, resolveTitles } from './resolve.js'
+import { resolveTitle, resolveTitles, withReleaseDates } from './resolve.js'
 
 /**
  * Identity is the part of the system with a real cost of being wrong: a user's
@@ -145,6 +145,23 @@ Deno.test('resolving many ids returns one entry each', async () => {
 
 Deno.test('resolving nothing is not an error', async () => {
 	assertEquals((await resolveTitles([])).size, 0)
+})
+
+Deno.test("a member carries its title's release date, not its own", async () => {
+	await seed()
+	await sql`update titles set first_release_date = '2020-05-01' where id = ${ROOT}`
+	const results = await withReleaseDates(await resolveTitles([DLC, NEVER_MIRRORED]))
+	// The DLC's own date is 2020-06-01; the feed asks whether the title is out.
+	assertEquals(results.get(DLC)?.firstReleaseDate, '2020-05-01T00:00:00.000Z')
+	assertEquals(results.get(NEVER_MIRRORED)?.firstReleaseDate, null)
+	await cleanup()
+})
+
+Deno.test('a title with no release date reads as null', async () => {
+	await seed()
+	const results = await withReleaseDates(await resolveTitles([ROOT]))
+	assertEquals(results.get(ROOT)?.firstReleaseDate, null)
+	await cleanup()
 })
 
 // ---------------------------------------------------------------------------

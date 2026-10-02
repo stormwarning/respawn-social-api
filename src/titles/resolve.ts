@@ -156,3 +156,42 @@ export async function resolveTitle(id: number): Promise<ResolveResult> {
 	const results = await resolveTitles([id])
 	return results.get(id) ?? { titleId: null, status: 'deleted', via: 'unknown' }
 }
+
+export interface ResolveResultWithRelease extends ResolveResult {
+	/** The resolved title's first release, ISO; null when unknown, TBA, or unresolved. */
+	firstReleaseDate: string | null
+}
+
+/**
+ * Attach each resolved title's release date.
+ *
+ * Separate from `resolveTitles` so identity stays about identity: the activity
+ * feed needs to hide logs of games that are not out yet, and checks the date
+ * fresh on every read because release dates slip.
+ */
+export async function withReleaseDates(
+	results: Map<number, ResolveResult>,
+): Promise<Map<number, ResolveResultWithRelease>> {
+	const titleIds = [
+		...new Set([...results.values()].flatMap((r) => (r.titleId === null ? [] : [r.titleId]))),
+	]
+	const rows =
+		titleIds.length === 0
+			? []
+			: await sql<Array<{ id: string; first_release_date: Date | string | null }>>`
+				select id, first_release_date from titles where id = any(${titleIds})
+			`
+	const dates = new Map(
+		rows.map((row) => [
+			Number(row.id),
+			row.first_release_date === null ? null : new Date(row.first_release_date).toISOString(),
+		]),
+	)
+
+	const out = new Map<number, ResolveResultWithRelease>()
+	for (const [id, result] of results) {
+		const firstReleaseDate = result.titleId === null ? null : (dates.get(result.titleId) ?? null)
+		out.set(id, { ...result, firstReleaseDate })
+	}
+	return out
+}
