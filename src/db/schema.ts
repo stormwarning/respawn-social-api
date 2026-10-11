@@ -12,6 +12,9 @@ export * from './schema.mirror.js'
  */
 export * from './schema.derived.js'
 
+/** Play sync: linked gaming accounts and the plays noticed on them. */
+export * from './schema.sync.js'
+
 /**
  * Database schema (Drizzle).
  *

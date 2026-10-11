@@ -43,6 +43,7 @@ src/
   db/
     schema.ts         All database tables (the source of truth).
     schema.mirror.ts  GENERATED — the igdb_* canonical tables.
+    schema.sync.ts    Linked gaming accounts, playtime snapshots, detected plays.
     client.ts         The Postgres connection pool + Drizzle client.
     migrate.ts        Applies SQL migrations (run on deploy).
 
@@ -83,10 +84,19 @@ src/
     token.ts          Fetches/caches/refreshes the Twitch (IGDB) access token.
     client.ts         The rate-limited request queue (the 4 req/s gate) + retries.
 
+  sync/               === Play sync: linked accounts -> detected plays ===
+    provider.ts       What a platform must provide: a library with playtimes.
+    steam.ts          Steam via the official Web API (GetOwnedGames).
+    diff.ts           Two snapshots -> plays (pure).
+    run.ts            Sync one account, or every account that is due.
+    store.ts          Account and play queries behind the /sync routes.
+    worker.ts         Polls due accounts in-process (PLAY_SYNC_ENABLED).
+
   routes/
     games.ts          GET /games/:id, /games/slug/:slug, /games/:id/members,
                       /games/browse,
                       /games/search
+    sync.ts           /sync/accounts, /sync/plays — web server only.
 ```
 
 Most files have inline comments explaining the backend concept they implement.
@@ -254,6 +264,18 @@ searches ~10 ms.
 | GET    | `/games/:id/members`    | Every IGDB id that resolves to this title.             |
 | GET    | `/games/search?q=zelda` | Search, including folded DLC and alternative names.    |
 
+The `/sync` routes act on one user's data by did, so they require the
+`X-Internal-Secret` header (`INTERNAL_API_SECRET`) and answer 503 without one
+configured. Only the web server calls them.
+
+| Method | Path                       | Description                                          |
+| ------ | -------------------------- | ---------------------------------------------------- |
+| GET    | `/sync/accounts?did=`      | The user's linked accounts and their sync status.    |
+| POST   | `/sync/accounts`           | Link an account and run its baseline sync.           |
+| DELETE | `/sync/accounts/:id?did=`  | Unlink, dropping its snapshot and plays.             |
+| GET    | `/sync/plays?did=&status=` | Detected plays (default `pending`), with titles.     |
+| POST   | `/sync/plays/:id/resolve`  | Mark a play `logged` (with `logUri`) or `dismissed`. |
+
 Quick check:
 
 ```bash
@@ -301,6 +323,25 @@ Webhooks are **off** unless `IGDB_WEBHOOKS_ENABLED=true`, and need `PUBLIC_URL`
 and `IGDB_WEBHOOK_SECRET`. IGDB cannot deliver to localhost, and five failed
 deliveries deactivate a webhook, so registering from a dev machine is worse than
 not registering at all.
+
+---
+
+## Play sync
+
+None of the platforms push "you played X". Steam exposes a running playtime
+total per game, so a sync fetches the library, diffs it against the last
+snapshot, and files every increase as a detected play (one row per game per
+day). The first sync after linking is a baseline and files nothing. Plays wait
+in the user's inbox; the web app creates the log when they confirm one. Nothing
+here writes to a PDS.
+
+```bash
+deno task cron:sync      # poll every account that is due, exit
+```
+
+Same split as freshness: `PLAY_SYNC_ENABLED=true` polls in-process for a
+long-lived instance, `cron:sync` on a schedule for one that sleeps. Accounts are
+claimed before they are polled, so the two can overlap. Needs `STEAM_API_KEY`.
 
 ---
 

@@ -4,10 +4,12 @@ import { config } from './config.js'
 import { logger } from './logger.js'
 import { coversRoutes } from './routes/covers.js'
 import { gamesRoutes } from './routes/games.js'
+import { syncRoutes } from './routes/sync.js'
 import { webhooksRoutes } from './routes/webhooks.js'
 import { startDeriveWorker, stopDeriveWorker, workerStatus } from './derive/worker.js'
 import { schedulerStatus, startDumpScheduler, stopDumpScheduler } from './mirror/scheduler.js'
 import { ensureWebhooks } from './mirror/webhooks.js'
+import { startSyncWorker, stopSyncWorker, syncWorkerStatus } from './sync/worker.js'
 import { mirrorHealth } from './titles/read.js'
 
 const app = new Hono()
@@ -54,6 +56,7 @@ app.get('/health', async (c) => {
 			worker: workerStatus(),
 			dumps: schedulerStatus(),
 			webhooks: webhookHealth,
+			sync: syncWorkerStatus(),
 		})
 	} catch (err) {
 		logger.error(err, 'health check could not read the mirror')
@@ -65,6 +68,7 @@ app.get('/health', async (c) => {
 app.route('/games', gamesRoutes) // Derived titles, served from Postgres
 app.route('/covers', coversRoutes) // Cover colours, computed once and shared
 app.route('/webhooks', webhooksRoutes) // IGDB change notifications
+app.route('/sync', syncRoutes) // Linked gaming accounts; web server only
 
 /**
  * Fallback handlers.
@@ -105,6 +109,8 @@ if (config.DERIVE_WORKER_ENABLED) {
 
 startDumpScheduler()
 
+startSyncWorker()
+
 ensureWebhooks()
 	.then((result) => {
 		webhookHealth = result
@@ -122,6 +128,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 	Deno.addSignalListener(signal, () => {
 		logger.info({ signal }, 'Shutting down')
 		stopDumpScheduler()
+		stopSyncWorker()
 		void stopDeriveWorker().finally(() => {
 			void server.shutdown().finally(() => Deno.exit(0))
 		})

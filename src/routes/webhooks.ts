@@ -6,6 +6,7 @@ import { logger } from '../logger.js'
 import { ENDPOINT_NAMES, type Endpoint } from '../mirror/endpoints.js'
 import { applyDeleteRedirect } from '../mirror/redirect.js'
 import { markDeleted, upsertEntity } from '../mirror/upsert.js'
+import { timingSafeEqual } from '../secret.js'
 
 /**
  * IGDB webhook receiver.
@@ -107,16 +108,3 @@ webhooksRoutes.post('/igdb', async (c) => {
 		return c.text('', 500)
 	}
 })
-
-/**
- * Compare without leaking length or position through timing.
- *
- * The secret is low-value and IGDB is not an attacker, but a plain `===` on a
- * credential is the kind of thing that gets copied into somewhere it matters.
- */
-function timingSafeEqual(a: string, b: string): boolean {
-	if (a.length !== b.length) return false
-	let diff = 0
-	for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
-	return diff === 0
-}

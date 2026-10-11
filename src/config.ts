@@ -75,6 +75,27 @@ const EnvSchema = z.object({
 		.default('false')
 		.transform((v) => v === 'true'),
 
+	// ---- Play sync ----
+	// Steam Web API key (https://steamcommunity.com/dev/apikey). Without one,
+	// Steam accounts can still be linked but never sync.
+	STEAM_API_KEY: z.string().min(1).optional(),
+
+	// Shared secret the web server sends in X-Internal-Secret on /sync routes.
+	// Those routes act on a user's data by did alone, so they must never be
+	// reachable from a browser; without the secret they answer 503.
+	INTERNAL_API_SECRET: z.string().min(16).optional(),
+
+	// Poll linked accounts in-process. Off by default for the same reason as the
+	// derive worker: it needs a process that stays alive. `deno task cron:sync`
+	// does one pass and exits, for a deployment that sleeps.
+	PLAY_SYNC_ENABLED: z
+		.string()
+		.default('false')
+		.transform((v) => v === 'true'),
+
+	// How stale an account may get before it is polled again.
+	PLAY_SYNC_INTERVAL_MINUTES: z.coerce.number().int().min(5).default(30),
+
 	NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 })
 
